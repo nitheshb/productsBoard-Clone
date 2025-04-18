@@ -9,8 +9,8 @@ export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
-    const handleProductsSelect = (productId: string) => {
-        setSelectedProductIds([productId]);
+    const handleProductsSelect = (productIds: string[]) => {
+        setSelectedProductIds(productIds);
     };
 
     return (
