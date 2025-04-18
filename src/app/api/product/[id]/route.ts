@@ -239,7 +239,7 @@ export async function PUT(
         targetDate: body.targetDate || null,
         completedOn: body.completedOn || null,
         remarks: body.remarks || null,
-        owner_initials: body.owner_initials,
+        owner: body.owner,
         importance: body.importance
       })
       .eq('id', id)

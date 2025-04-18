@@ -1,5 +1,3 @@
-
-
 // page.tsx
 'use client';
 import { useState } from 'react';
@@ -48,7 +46,7 @@ export default function Home() {
                             </svg>
                         </button>
                     </div>
-                </header>
+                
 
                 <div className="flex items-center p-4 border-b">
                     <div className="flex items-center gap-3">
@@ -69,6 +67,8 @@ export default function Home() {
                         </button>
                     </div>
                 </div>
+
+                </header>
 
                 <div className="p-4">
                     <ProductTable selectedProductIds={selectedProductIds} /> {/* Pass selectedProductIds to ProductTable */}

@@ -44,6 +44,8 @@ export interface Product {
   remarks?: string; // Added remarks
   created_at: string;
   components?: Component[];
+  owner?: string;
+  
 }
 
 export interface Component {
@@ -60,6 +62,8 @@ export interface Component {
   remarks?: string; // Added remarks
   created_at: string;
   features?: Feature[];
+  owner?: string;
+ 
 }
 
 export interface Feature {
@@ -76,4 +80,16 @@ export interface Feature {
   remarks?: string; // Added remarks
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
+  owner?: string;
+  
+}
+
+
+export interface TableItem {
+  type: 'product' | 'component' | 'feature';
+  id: string;
+  name: string;
+  level: number;
+  data: Product | Component | Feature;
+  children?: TableItem[];
 }
