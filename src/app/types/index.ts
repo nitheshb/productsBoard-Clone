@@ -62,7 +62,7 @@ export interface Component {
   remarks?: string; // Added remarks
   created_at: string;
   features?: Feature[];
-  owner?: string;
+ 
  
 }
 

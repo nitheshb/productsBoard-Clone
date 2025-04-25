@@ -125,6 +125,10 @@ export async function GET(
   try {
     const { id } = params;
 
+    if (!id) {
+      return NextResponse.json({ error: 'Invalid component ID' }, { status: 400 });
+    }
+
     // Fetch the component
     const { data: component, error: componentError } = await supabase
       .from('components')
@@ -136,7 +140,8 @@ export async function GET(
       if (componentError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Component not found' }, { status: 404 });
       }
-      throw componentError;
+      console.error('Database error fetching component:', componentError);
+      return NextResponse.json({ error: 'Failed to fetch component' }, { status: 500 });
     }
 
     // Fetch features for this component
@@ -145,15 +150,21 @@ export async function GET(
       .select('*')
       .eq('component_id', id);
 
-    if (featuresError) throw featuresError;
+      if (featuresError) {
+        console.error('Database error fetching features:', featuresError);
+        return NextResponse.json({ error: 'Failed to fetch features' }, { status: 500 });
+      }
+  
 
     // Add features to the component
     const structuredComponent = {
       ...component,
       features
     };
-
-    return NextResponse.json(structuredComponent);
+    return NextResponse.json({
+      ...component,
+      features: features || []
+    });
   } catch (error) {
     console.error('Error fetching component:', error);
     return NextResponse.json({ error: 'Failed to fetch component' }, { status: 500 });
@@ -188,16 +199,7 @@ export async function PUT(
       .from('components')
       .update({
         name: body.name,
-        status: body.status || null,
-        progress: body.progress !== undefined ? body.progress : null,
-        team: body.team || null,
-        days: body.days !== undefined ? body.days : null,
-        startDate: body.startDate || null,
-        targetDate: body.targetDate || null,
-        completedOn: body.completedOn || null,
-        remarks: body.remarks || null,
-        owner_initials: body.owner_initials,
-        importance: body.importance,
+       
         product_id: body.product_id // Allow moving to a different product
       })
       .eq('id', id)

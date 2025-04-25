@@ -1115,7 +1115,10 @@ import {
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import Link from 'next/link';
-import { ProductDetailsPage } from './_components/productDetails';
+import ProductDetailsPage from './_components/productDetails';
+import ComponentDetailsPage from './_components/componentDetails';
+import FeatureDetailsPage from './_components/featureDetails';
+// import { ProductDetailsPage } from './_components/productDetails';
 
 interface TableItem {
     type: 'product' | 'component' | 'feature';
@@ -1401,7 +1404,10 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
     const [newComponentName, setNewComponentName] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<TableItem | null>(null);
     const [isProductDetailOpen, setIsProductDetailOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('details');
+    const [selectedComponent, setSelectedComponent] = useState<TableItem | null>(null);
+const [isComponentDetailOpen, setIsComponentDetailOpen] = useState(false);
+const [selectedFeature, setSelectedFeature] = useState<TableItem | null>(null);
+const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
 
 
     useEffect(() => {
@@ -1419,9 +1425,28 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
         }
     }, [selectedProductIds, allTableData]);
 
+    const handleProductUpdate = (updatedProduct: Product) => {
+        setTableData(prevData =>
+          prevData.map(item =>
+            item.type === 'product' && item.id === updatedProduct.id
+              ? { ...item, data: updatedProduct }
+              : item
+          )
+        );
+        setAllTableData(prevData =>
+          prevData.map(item =>
+            item.type === 'product' && item.id === updatedProduct.id
+              ? { ...item, data: updatedProduct }
+              : item
+          )
+        );
+      };
+
     const handleCreateProductClick = () => {
         setCreatingProduct(true);
     };
+
+    
 
 
     const handleProductSelection = (product: TableItem) => {
@@ -1429,24 +1454,43 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
         setIsProductDetailOpen(true);
     };
 
+    const handleComponentSelection = (component: TableItem) => {
+        setSelectedComponent(component);
+        setIsComponentDetailOpen(true);
+    };
+
+    const handleFeatureSelection = (feature: TableItem) => {
+        setSelectedFeature(feature);
+        setIsFeatureDetailOpen(true);
+      };
+
 
     const handleCloseProductDetails = () => {
         setIsProductDetailOpen(false);
     };
+
+    const handleCloseComponentDetails = () => {
+        setIsComponentDetailOpen(false);
+    };
     
+
+    const handleCloseFeatureDetails = () => {
+        setIsFeatureDetailOpen(false);
+      };
+      
     const handleCreateComponentClick = (productId: string) => {
         setSelectedProductIdForComponent(productId);
         setIsCreateComponentModalOpen(true);
     };
 
-    const handleAddComponentAfter = (componentId: string) => {
-        setCreatingComponentForProduct(`AFTER_${componentId}`);
-    };
-
+  
     const handleCreateFeatureClick = (componentId: string) => {
         setSelectedComponentIdForFeature(componentId);
         setIsCreateFeatureModalOpen(true);
     };
+
+
+    
 
     async function fetchProducts() {
         try {
@@ -1752,7 +1796,7 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
     };
 
     const getFeatureColorClass = (index: number) => {
-        const colors = ['bg-yellow-400', 'bg-teal-400', 'bg-blue-500'];
+        const colors = ['bg-yellow-400', 'bg-cyan-400', 'bg-blue-400'];
         return colors[index % colors.length];
     };
 
@@ -1804,9 +1848,21 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
                                   <ChevronRight size={18} className="text-gray-500" />
                               )
                           )}
-                          <div className="flex items-center gap-2">
+                          {/* <div className="flex items-center gap-2"> */}
+                          <div
+    className={`flex items-center gap-2 cursor-pointer ${child.type === 'component' || child.type === 'feature' ? 'text-gray-500 text-[14px]' : ''}`}
+    onClick={(e) => {
+      if (child.type === 'component') {
+        e.stopPropagation();
+        handleComponentSelection(child);
+      } else if (child.type === 'feature') {
+        e.stopPropagation();
+        handleFeatureSelection(child);
+      }
+    }}
+  >
                               {child.level === 1 && (
-                                  <span className="p-1 bg-gray-300 rounded-md">
+                                  <span className="p-1 bg-white text-gray-500 rounded-md">
                                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                           <rect x="3" y="3" width="7" height="7" rx="1" />
                                           <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -1817,9 +1873,22 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
                                   
                               )}
                               {child.level === 2 && (
-                                  <span className={`p-1 ${getFeatureColorClass(0)} rounded-md w-4 h-4`}></span>
-                              )}
-                              {child.name}
+                                <span className={`inline-block ${getFeatureColorClass(Math.floor(Math.random() * 3))} w-4 h-4 rounded-sm`}></span>
+)}
+<span 
+  className={`cursor-pointer ${child.type === 'component' ? 'hover:text-blue-600' : child.type === 'feature' ? 'hover:text-blue-600' : ''} text-gray-700 text-[14px]`}
+  onClick={(e) => {
+    if (child.type === 'component') {
+      e.stopPropagation();
+      handleComponentSelection(child);
+    } else if (child.type === 'feature') {
+      e.stopPropagation();
+      handleFeatureSelection(child);
+    }
+  }}
+>
+  {child.name}
+</span>
                           </div>
                       </div>
                       
@@ -1836,20 +1905,26 @@ export default function ProductTable({ selectedProductIds }: ProductTableProps) 
                           </button>
                       )}
                   </div>
-                  <div className="col-span-1 text-center">{child.data.status || ''}</div>
-                  <div className="col-span-1 text-center">{child.data.progress !== undefined ? `${child.data.progress}%` : ''}</div>
-                  <div className="col-span-1 text-center">{child.data.team || ''}</div>
-                  <div className="col-span-1 text-center">{child.data.days !== undefined ? child.data.days : ''}</div>
-                  <div className="col-span-1 text-center">{child.data.startDate || ''}</div>
-                  <div className="col-span-1 text-center">{child.data.targetDate || ''}</div>
-                  <div className="col-span-1 text-center">{child.data.completedOn || ''}</div>
-                  <div className="col-span-2">{child.data.remarks || ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{child.data.status || ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700">{child.data.progress !== undefined ? `${child.data.progress}%` : ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{child.data.team || ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700">{child.data.days !== undefined ? child.data.days : ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700">{child.data.startDate || ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700">{child.data.targetDate || ''}</div>
+                  <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap
+ ">{child.data.completedOn || ''}</div>
+                  <div className="col-span-2 text-[14px] text-gray-700 whitespace-nowrap
+">
+                    <span>
+                    {child.data.remarks || ''}
+                    </span>
+                    </div>
               </div>
               {child.children && isExpanded(child.type, child.id) && renderChildren(child.children)}
               
               {child.level === 1 && creatingComponentForProduct === `AFTER_${child.id}` && (
                   <div 
-                      className="grid grid-cols-12 py-2 px-4 items-center hover:bg-gray-50"
+                      className="grid grid-cols-12 py-3 px-4 items-center hover:bg-gray-50 border-b border-gray-100"
                       style={{ paddingLeft: `${16 + child.level * 16}px` }}
                   >
                       <div className="col-span-3 flex items-center gap-2">
@@ -1920,24 +1995,42 @@ return (
     productId={selectedProduct.data.id} // Pass the ID to fetch details within ProductDetailsPage
     isOpen={isProductDetailOpen}
     onClose={handleCloseProductDetails}
+    onProductUpdated={handleProductUpdate}
   />
 )}
 
-          <div className="bg-gray-100 border-b">
-              <div className="grid grid-cols-12 py-3 px-4 font-medium text-gray-700 gap-x-4">
-                  <div className="col-span-3">Features list</div>
-                  <div className="col-span-1 text-center">Status</div>
-                  <div className="col-span-1 text-center">%</div>
-                  <div className="col-span-1 text-center">Team</div>
-                  <div className="col-span-1 text-center">Days</div>
-                  <div className="col-span-1 text-center">Start Date</div>
-                  <div className="col-span-1 text-center">Target Date</div>
-                  <div className="col-span-1 text-center">Completed On</div>
-                  <div className="col-span-2">Remarks</div>
+{selectedComponent && (
+                    <ComponentDetailsPage
+                        componentId={selectedComponent.data.id}
+                        isOpen={isComponentDetailOpen}
+                        onClose={handleCloseComponentDetails}
+                    />
+                )}
+
+
+{selectedFeature && (
+  <FeatureDetailsPage
+    featureId={selectedFeature.data.id}
+    isOpen={isFeatureDetailOpen}
+    onClose={handleCloseFeatureDetails}
+  />
+)}
+
+          <div className="bg-gray-100 border-b px-5">
+              <div className="grid grid-cols-12 py-3 px-2 font-medium text-gray-700 gap-x-4 ">
+                  <div className="col-span-3 text-[13px] font-bold">Products, Components, Features</div>
+                  <div className="col-span-1 text-center text-[13px] font-bold">Status</div>
+                  <div className="col-span-1 text-center  text-[13px] font-bold ">Progress</div>
+                  <div className="col-span-1 text-center  text-[13px] font-bold">Team</div>
+                  <div className="col-span-1 text-center text-[13px] font-bold">Days</div>
+                  <div className="col-span-1 text-center text-[13px] font-bold">Start Date</div>
+                  <div className="col-span-1 text-center text-[13px] font-bold">Target Date</div>
+                  <div className="col-span-1 text-center  text-[13px] font-bold">Completedon</div>
+                  <div className="col-span-1 text-center  text-[13px] font-bold">Remarks</div>
               </div>
           </div>
 
-          <div className="divide-y">
+          <div className="divide-y bg-white px-6">
               {tableData.map((item) => (
                   <div key={item.id}>
                       <div
@@ -1956,16 +2049,16 @@ return (
                                           <ChevronRight size={18} className="text-gray-500" />
                                       )
                                   )}
-                                  <div className="flex items-center gap-2">
+                                  
+                                  <div className="flex items-center gap-2 text-gray-800 bg-white">
                                       {item.level === 0 && (
-                                          <span className="p-1 bg-gray-300 rounded-md">
-                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                                              </svg>
-                                          </span>
+                                         <div className="p-1 bg-white text-gray-400 rounded-md">
+                            
+                                         <svg height="16px" width="16px" viewBox="0 0 16 16" role="img" aria-label="ProductIcon" className="sc-fQpRED cOkelz ui-icon"><path fill="currentColor" fill-rule="evenodd" d="M1.25 4A2.75 2.75 0 0 1 4 1.25h8A2.75 2.75 0 0 1 14.75 4v8A2.75 2.75 0 0 1 12 14.75H4A2.75 2.75 0 0 1 1.25 12zM4 2.75c-.69 0-1.25.56-1.25 1.25v1.25h10.5V4c0-.69-.56-1.25-1.25-1.25zm9.25 4H2.75V12c0 .69.56 1.25 1.25 1.25h8c.69 0 1.25-.56 1.25-1.25z" clip-rule="evenodd"></path></svg>
+                                     </div>
                                       )}
                                       <span 
-                                          className={`cursor-pointer ${item.type === 'product' ? 'hover:text-blue-600' : ''}`}
+                                          className={`cursor-pointer ${item.type === 'product' ? 'hover:text-blue-600' : ''} text-gray-700 text-[16px]`}
                                           onClick={(e) => {
                                               if (item.type === 'product') {
                                                   e.stopPropagation();
@@ -2003,21 +2096,27 @@ return (
                                   </>
                               )}
                           </div>
-                          <div className="col-span-1 text-center">{item.data.status || ''}</div>
-                          <div className="col-span-1 text-center">{item.data.progress !== undefined ? `${item.data.progress}%` : ''}</div>
-                          <div className="col-span-1 text-center">{item.data.team || ''}</div>
-                          <div className="col-span-1 text-center">{item.data.days !== undefined ? item.data.days : ''}</div>
-                          <div className="col-span-1 text-center">{item.data.startDate || ''}</div>
-                          <div className="col-span-1 text-center">{item.data.targetDate || ''}</div>
-                          <div className="col-span-1 text-center">{item.data.completedOn || ''}</div>
-                          <div className="col-span-2">{item.data.remarks || ''}</div>
+                          
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.status || ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.progress !== undefined ? `${item.data.progress}%` : ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.team || ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.days !== undefined ? item.data.days : ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.startDate || ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.targetDate || ''}</div>
+                          <div className="col-span-1 text-center text-[14px] text-gray-700 whitespace-nowrap">{item.data.completedOn || ''}</div>
+                          <div className="col-span-2 text-[14px] text-gray-700 whitespace-nowrap">
+                            <span>
+                            {item.data.remarks || ''}
+                            </span>
+                            </div>
+                      
                       </div>
                       {item.children && isExpanded(item.type, item.id) && renderChildren(item.children)}
                   </div>
               ))}
           </div>
 
-          <div className="mt-4 px-4">
+          <div className="mt-2 bg-gray-100 px-6">
               {creatingProduct ? (
                   <div className="grid grid-cols-12 py-2 items-center hover:bg-gray-50">
                       <div className="col-span-3 flex items-center gap-2">
@@ -2032,10 +2131,12 @@ return (
                       </div>
                   </div>
               ) : (
+                <div className='bg-white-200 px-5' >
                   <Button onClick={handleCreateProductClick}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Product
+                      Create Product
                   </Button>
+                  </div>
               )}
           </div>
       </div>

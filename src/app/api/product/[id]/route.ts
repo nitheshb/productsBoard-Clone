@@ -233,14 +233,9 @@ export async function PUT(
         name: body.name,
         status: body.status || null,
         progress: body.progress !== undefined ? body.progress : null,
-        team: body.team || null,
-        days: body.days !== undefined ? body.days : null,
-        startDate: body.startDate || null,
-        targetDate: body.targetDate || null,
-        completedOn: body.completedOn || null,
-        remarks: body.remarks || null,
+       
         owner: body.owner,
-        importance: body.importance
+       
       })
       .eq('id', id)
       .select();
