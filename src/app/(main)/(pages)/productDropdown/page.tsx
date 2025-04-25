@@ -12,7 +12,7 @@ interface Product {
 }
 
 interface ProductDropdownProps {
-  onProductSelect: (productId: string[]) => void;
+  onProductSelect: (productId: any) => void;
 }
 
 const ProductDropdown: React.FC<ProductDropdownProps> = ({ onProductSelect }) => {
