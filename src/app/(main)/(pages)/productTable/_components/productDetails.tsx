@@ -3824,7 +3824,7 @@ function PortalTabContent() {
   return <div>Content for Portal tab</div>;
 }
 
-export function ProductDetailsPage({ productId, isOpen, onClose }: ProductDetailsPageProps) {
+export function ProductDetailsPage({ productId, isOpen, onClose }: any) {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
