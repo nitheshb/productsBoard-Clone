@@ -2,9 +2,9 @@
 
 'use client';
 import { useState } from 'react';
-import ProductTable from '@/app/(main)/(pages)/productTable/page';
+import ProductTable from '@/app/(main)/(pages)/productTable/ProductTable';
 import { Search } from 'lucide-react';
-import ProductDropdown from '@/app/(main)/(pages)/productDropdown/page';
+import ProductDropdown from '@/app/(main)/(pages)/productDropdown/ProductDropdown';
 import Sidebar from './_components/sidebar';
 
 export default function Home() {

@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
         completedOn: body.completedOn || null,
         remarks: body.remarks || null,
         owner_initials: body.owner_initials || null,
-        importance: body.importance || null,
         color: body.color || null
       }])
       .select();

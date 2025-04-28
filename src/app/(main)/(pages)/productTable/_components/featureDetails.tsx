@@ -507,11 +507,7 @@ export function FeatureDetailsPage({
                 isActive={activeTab === "insights"}
                 onClick={() => handleTabChange("insights")}
               />
-              <FeatureDetailsTab
-                label="Health"
-                isActive={activeTab === "health"}
-                onClick={() => handleTabChange("health")}
-              />
+             
               <FeatureDetailsTab
                 label="Portal"
                 isActive={activeTab === "portal"}

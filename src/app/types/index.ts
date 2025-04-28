@@ -1,33 +1,4 @@
-export type Phase = {
-  id: number;
-  name: string;
-  tasks: Task[];
-  status: number;
-  workDays: number;
-};
 
-export type Task = {
-  id: number;
-  name: string;
-  phaseId: number;
-  status: number;
-  progress: number;
-  workDays: number;
-  startDate: string;
-  endDate: string;
-  team?: string;
-  days?: number;
-  targetDate?: string;
-  remarks?: string;
-};
-
-
-export type Project = {
-  id: number;
-  name: string;
-  address: string;
-  phases: Phase[];
-};
 
 // app/types/index.ts
 
