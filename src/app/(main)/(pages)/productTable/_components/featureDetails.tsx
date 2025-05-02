@@ -604,7 +604,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Trash2, MoreVertical } from "lucide-react";
-import { Feature } from "@/app/types"; 
+import { Feature } from "@/app/types"; // Assuming this type exists
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
