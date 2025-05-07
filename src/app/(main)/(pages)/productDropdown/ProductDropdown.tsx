@@ -28,14 +28,14 @@ const ProductDropdown: React.FC<ProductDropdownProps> = ({ onProductSelect }) =>
   async function fetchProducts() {
     try {
       setLoading(true);
-      const res = await fetch('/api/product'); // Changed to fetch from your API route
+      const res = await fetch('/api/product');
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       const data: Product[] = await res.json();
       setProducts(data.map(product => ({
         ...product,
-        type: 'Product', // You can adjust this as needed
+        type: 'Product',
       })));
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -66,10 +66,9 @@ const ProductDropdown: React.FC<ProductDropdownProps> = ({ onProductSelect }) =>
             <>
               <button
                 onClick={() => {
-                  setSelectedProduct( null); // Set to the first product's name or null
-                  onProductSelect(products.map((product) => product.id)); // Reset selection to an empty string
+                  setSelectedProduct(null);
+                  onProductSelect(products.map((product) => product.id));
                   setIsOpen(false);
-                //   setIsOpen(false);
                 }}
                 className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 focus:outline-none"
               >

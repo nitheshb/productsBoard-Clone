@@ -26,6 +26,7 @@ export default function Home() {
                             <div className="p-1 bg-white text-gray-400 rounded-md">
                                 <svg height="16px" width="16px" viewBox="0 0 16 16" role="img" aria-label="ProductIcon" className="sc-fQpRED cOkelz ui-icon"><path fill="currentColor" fillRule="evenodd" d="M1.25 4A2.75 2.75 0 0 1 4 1.25h8A2.75 2.75 0 0 1 14.75 4v8A2.75 2.75 0 0 1 12 14.75H4A2.75 2.75 0 0 1 1.25 12zM4 2.75c-.69 0-1.25.56-1.25 1.25v1.25h10.5V4c0-.69-.56-1.25-1.25-1.25zm9.25 4H2.75V12c0 .69.56 1.25 1.25 1.25h8c.69 0 1.25-.56 1.25-1.25z" clipRule="evenodd"></path></svg>
                             </div>
+                            
                             <ProductDropdown onProductSelect={handleProductsSelect} />
                         </div>
 
