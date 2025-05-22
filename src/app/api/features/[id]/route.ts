@@ -686,11 +686,15 @@ const calculateProgressFromStatus = (status: string): number => {
 // Function to update component progress based on its features
 async function updateComponentProgress(componentId: string) {
   try {
+
+ 
     // Get all features for this component
     const { data: features, error: featuresError } = await supabase
       .from('features')
-      .select('progress')
-      .eq('component_id', componentId);
+      .select('progress ')
+      .eq('component_id', componentId)
+      
+      
     
     if (featuresError) throw featuresError;
     
@@ -784,7 +788,7 @@ export async function GET(
   }
 }
 
-// Update a feature
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -793,7 +797,10 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    // Check if feature exists
+    // Extract teamFilter from the request body
+    const teamFilter = body.teamFilter || [];  // Extract teamFilter from the request body
+
+    // Fetch the feature data
     const { data: existingFeature, error: checkError } = await supabase
       .from('features')
       .select('*')
@@ -807,11 +814,7 @@ export async function PUT(
       throw checkError;
     }
 
-    // Extract the flag before updating the feature
-    const shouldUpdateComponentProgress = body.updateComponentProgress !== false; // Default to true
-    delete body.updateComponentProgress;
-
-    // Handle the case where we're updating draftFeature directly
+    // Regular update logic
     let updateObject = { ...existingFeature };
     if (body.draftFeature) {
       updateObject = { ...body.draftFeature };
@@ -830,7 +833,7 @@ export async function PUT(
       updateObject.progress = calculateProgressFromStatus(body.status);
     }
 
-    // Update the feature
+    // Update the feature with regular progress calculation
     const { data, error } = await supabase
       .from('features')
       .update(updateObject)
@@ -839,24 +842,55 @@ export async function PUT(
 
     if (error) throw error;
 
-    // Handle component progress updates
-    if (shouldUpdateComponentProgress) {
-      // If component_id changed, update both old and new component progress
-      if (updateObject.component_id && updateObject.component_id !== existingFeature.component_id) {
-        await updateComponentProgress(existingFeature.component_id);
-        await updateComponentProgress(updateObject.component_id);
-      } else {
-        // Otherwise just update the current component's progress
-        await updateComponentProgress(existingFeature.component_id);
-      }
+    // Now we add the logic to calculate progress based on teamFilter if provided
+    if (teamFilter && teamFilter.length > 0) {
+      // Fetch features related to the selected team(s)
+      const { data: teamFilteredFeatures, error: teamError } = await supabase
+        .from('features')
+        .select('progress, team, status')
+        .eq('component_id', existingFeature.component_id)
+        .in('team', teamFilter);
+
+      if (teamError) throw teamError;
+
+      // Calculate average progress for the selected team(s)
+      const totalTeamProgress = teamFilteredFeatures.reduce((sum, feature) => sum + (feature.progress || 0), 0);
+      const averageTeamProgress = teamFilteredFeatures.length > 0 ? Math.round(totalTeamProgress / teamFilteredFeatures.length) : 0;
+
+      // Update component progress based on selected team filter
+      const { error: teamUpdateError } = await supabase
+        .from('components')
+        .update({ progress: averageTeamProgress })
+        .eq('id', existingFeature.component_id);
+
+      if (teamUpdateError) throw teamUpdateError;
+
+      // Optionally update product progress based on the component
+      const { data: component, error: componentError } = await supabase
+        .from('components')
+        .select('product_id')
+        .eq('id', existingFeature.component_id)
+        .single();
+
+      if (componentError) throw componentError;
+
+      // Update the product's progress with the new team-based progress
+      await updateProductProgress(component.product_id);
+
+      return NextResponse.json({ 
+        progress: averageTeamProgress, // Return progress calculated from the team filter
+        message: 'Feature updated successfully with team-based progress'
+      });
     }
 
     return NextResponse.json(data[0]);
+
   } catch (error) {
     console.error('Error updating feature:', error);
     return NextResponse.json({ error: 'Failed to update feature' }, { status: 500 });
   }
 }
+
 
 // Delete a feature
 export async function DELETE(
