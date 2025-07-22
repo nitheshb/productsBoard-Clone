@@ -122,16 +122,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete feature' }, { status: 500 });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
