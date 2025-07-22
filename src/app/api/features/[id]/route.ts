@@ -602,7 +602,6 @@
 
 //     // If status is being updated but progress isn't specified, calculate progress from status
 //     if (body.status && body.status !== existingFeature.status && body.progress === undefined) {
-//       body.progress = calculateProgressFromStatus(body.status);
 //       updateObject.progress = calculateProgressFromStatus(body.status);
 //     }
 
@@ -616,13 +615,17 @@
 
 //     if (error) throw error;
 
-//     // If component_id changed, update both old and new component progress
-//     if (body.component_id && body.component_id !== existingFeature.component_id) {
-//       await updateComponentProgress(existingFeature.component_id);
-//       await updateComponentProgress(body.component_id);
-//     } else {
-//       // Otherwise just update the current component's progress
-//       await updateComponentProgress(existingFeature.component_id);
+//     // Only update component progress if explicitly requested or when moving to a different component
+//     if (shouldUpdateComponentProgress || 
+//         (body.component_id && body.component_id !== existingFeature.component_id)) {
+//       if (body.component_id && body.component_id !== existingFeature.component_id) {
+//         // Update both old and new component progress
+//         await updateComponentProgress(existingFeature.component_id);
+//         await updateComponentProgress(body.component_id);
+//       } else {
+//         // Otherwise just update the current component's progress
+//         await updateComponentProgress(existingFeature.component_id);
+//       }
 //     }
 
 //     return NextResponse.json(data[0]);
@@ -797,13 +800,10 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    // Extract teamFilter from the request body
-    const teamFilter = body.teamFilter || [];  // Extract teamFilter from the request body
-
-    // Fetch the feature data
+    // Check if feature exists
     const { data: existingFeature, error: checkError } = await supabase
       .from('features')
-      .select('*')
+      .select('id')
       .eq('id', id)
       .single();
 
@@ -814,77 +814,32 @@ export async function PUT(
       throw checkError;
     }
 
-    // Regular update logic
-    let updateObject = { ...existingFeature };
-    if (body.draftFeature) {
-      updateObject = { ...body.draftFeature };
-      delete updateObject.updateComponentProgress;
-    } else {
-      // Regular update case - copy only defined fields
-      Object.keys(body).forEach(key => {
-        if (body[key] !== undefined) {
-          updateObject[key] = body[key];
-        }
-      });
-    }
+    // Always update all fields, setting to null if not present in the body
+    const updateFields: any = {
+      name: body.name ?? null,
+      status: body.status ?? null,
+      progress: body.progress ?? null,
+      team: body.team ?? null,
+      days: body.days ?? null,
+      startdate: body.startDate ?? body.startdate ?? null,
+      targetdate: body.targetDate ?? body.targetdate ?? null,
+      completedon: body.completedOn ?? body.completedon ?? null,
+      remarks: body.remarks ?? null,
+      version: body.version ?? null,
+      color: body.color ?? null,
+      owner_initials: body.owner_initials ?? null,
+      component_id: body.component_id ?? null
+    };
 
-    // If status is being updated but progress isn't specified, calculate progress from status
-    if (body.status && body.status !== existingFeature.status && body.progress === undefined) {
-      updateObject.progress = calculateProgressFromStatus(body.status);
-    }
-
-    // Update the feature with regular progress calculation
     const { data, error } = await supabase
       .from('features')
-      .update(updateObject)
+      .update(updateFields)
       .eq('id', id)
       .select();
 
     if (error) throw error;
 
-    // Now we add the logic to calculate progress based on teamFilter if provided
-    if (teamFilter && teamFilter.length > 0) {
-      // Fetch features related to the selected team(s)
-      const { data: teamFilteredFeatures, error: teamError } = await supabase
-        .from('features')
-        .select('progress, team, status')
-        .eq('component_id', existingFeature.component_id)
-        .in('team', teamFilter);
-
-      if (teamError) throw teamError;
-
-      // Calculate average progress for the selected team(s)
-      const totalTeamProgress = teamFilteredFeatures.reduce((sum, feature) => sum + (feature.progress || 0), 0);
-      const averageTeamProgress = teamFilteredFeatures.length > 0 ? Math.round(totalTeamProgress / teamFilteredFeatures.length) : 0;
-
-      // Update component progress based on selected team filter
-      const { error: teamUpdateError } = await supabase
-        .from('components')
-        .update({ progress: averageTeamProgress })
-        .eq('id', existingFeature.component_id);
-
-      if (teamUpdateError) throw teamUpdateError;
-
-      // Optionally update product progress based on the component
-      const { data: component, error: componentError } = await supabase
-        .from('components')
-        .select('product_id')
-        .eq('id', existingFeature.component_id)
-        .single();
-
-      if (componentError) throw componentError;
-
-      // Update the product's progress with the new team-based progress
-      await updateProductProgress(component.product_id);
-
-      return NextResponse.json({ 
-        progress: averageTeamProgress, // Return progress calculated from the team filter
-        message: 'Feature updated successfully with team-based progress'
-      });
-    }
-
     return NextResponse.json(data[0]);
-
   } catch (error) {
     console.error('Error updating feature:', error);
     return NextResponse.json({ error: 'Failed to update feature' }, { status: 500 });
@@ -930,3 +885,5 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete feature' }, { status: 500 });
   }
 }
+
+

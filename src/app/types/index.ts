@@ -5,50 +5,51 @@
 export interface Product {
   id: string;
   name: string;
-  status?: string; // Added status
-  progress?: number; // Added progress
-  team?: string; // Added team
-  days?: number; // Added days
-  startDate?: string; // Added startDate
-  targetDate?: string; // Added targetDate
-  completedOn?: string; // Added completedOn
-  remarks?: string; // Added remarks
+  status?: string;
+  progress?: number;
+  version?: string;
+  team?: string;
+  days?: number;
+  startdate?: string;
+  targetdate?: string;
+  completedon?: string;
+  remarks?: string;
+  owner?: string;
   created_at: string;
   components?: Component[];
-  owner?: string;
-  
 }
 
 export interface Component {
   id: string;
   product_id: string;
   name: string;
-  status?: string; // Added status
-  progress?: number; // Added progress
-  team?: string; // Added team
-  days?: number; // Added days
-  startDate?: string; // Added startDate
-  targetDate?: string; // Added targetDate
-  completedOn?: string; // Added completedOn
-  remarks?: string; // Added remarks
+  status?: string;
+  progress?: number;
+  team?: string;
+  days?: number;
+  startdate?: string;
+  targetdate?: string;
+  completedon?: string;
+  remarks?: string;
+  version?: string;
   created_at: string;
   features?: Feature[];
- 
- 
 }
+
 
 export interface Feature {
   id: string;
   component_id: string;
   name: string;
-  status?: string; // Added status
-  progress?: number; // Added progress
-  team?: string; // Added team
-  days?: number; // Added days
-  startDate?: string; // Added startDate
-  targetDate?: string; // Added targetDate
-  completedOn?: string; // Added completedOn
-  remarks?: string; // Added remarks
+  status?: string;
+  progress?: number;
+  team?: string;
+  days?: number;
+  startdate?: string;
+  targetdate?: string;
+  completedon?: string;
+  remarks?: string;
+  version?: string;
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
   owner?: string;
@@ -64,3 +65,12 @@ export interface TableItem {
   data: Product | Component | Feature;
   children?: TableItem[];
 }
+
+export interface Version {
+  id: string;
+  version: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+

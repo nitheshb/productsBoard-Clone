@@ -74,7 +74,7 @@ export default function LoginPage() {
 
         <div className="flex items-center justify-center my-4">
           <div className="border-t border-gray-300 flex-grow"></div>
-          <span className="mx-4 text-gray-500 text-sm bg-gray-100 px-2">OR USE EMAIL</span>
+          <span className="mx-4 text-black text-sm bg-gray-100 px-2">OR USE EMAIL</span>
           <div className="border-t border-gray-300 flex-grow"></div>
         </div>
 
@@ -137,7 +137,7 @@ export default function LoginPage() {
             Log me in
           </button>
         </form>
-        <p className="text-center text-gray-500 text-xs">
+        <p className="text-center text-black text-xs">
           Don't have an account? <Link href="/register" className="font-semibold text-blue-500 hover:text-blue-800">Sign up</Link>
         </p>
       </div>

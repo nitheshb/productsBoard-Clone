@@ -10,7 +10,7 @@
 /* Define custom CSS variables for light theme */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
   --font-sans: 'Helvetica', sans-serif;  /* Replace with your desired font */
   --font-mono: 'Courier New', monospace; /* Replace with your desired font */
 }
@@ -26,6 +26,6 @@
 /* Apply the background and foreground color to the body */
 body {
   background-color: var(--background);
-  color: var(--foreground);
+  color: #000000;
   font-family: var(--font-sans);
 }

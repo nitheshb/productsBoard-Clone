@@ -213,7 +213,7 @@ async function updateComponentProgress(componentId: string) {
       throw featuresError;
     }
     
-    // Calculate average progress
+    // Calculate average progress from actual progress values
     const totalProgress = features.reduce((sum, feature) => sum + (feature.progress || 0), 0);
     const averageProgress = features.length > 0 ? Math.round(totalProgress / features.length) : 0;
     
@@ -229,21 +229,6 @@ async function updateComponentProgress(componentId: string) {
       console.error('Error updating component:', updateError);
       throw updateError;
     }
-    
-    // Get the product_id for this component
-    const { data: component, error: componentError } = await supabase
-      .from('components')
-      .select('product_id')
-      .eq('id', componentId)
-      .single();
-    
-    if (componentError) {
-      console.error('Error fetching component:', componentError);
-      throw componentError;
-    }
-    
-    // Update the product progress
-    await updateProductProgress(component.product_id);
     
     return averageProgress;
   } catch (error) {
@@ -322,12 +307,13 @@ export async function POST(request: NextRequest) {
         progress: featureData.progress !== undefined ? featureData.progress : 0,
         team: featureData.team || null,
         days: featureData.days !== undefined ? featureData.days : null,
-        startDate: featureData.startDate || null,
-        targetDate: featureData.targetDate || null,
-        completedOn: featureData.completedOn || null,
-        remarks: featureData.remarks || null
-      
-        
+        startdate: featureData.startDate || null,
+        targetdate: featureData.targetDate || null,
+        completedon: featureData.completedOn || null,
+        remarks: featureData.remarks || null,
+        version: featureData.version || '1.0.0',
+        color: featureData.color || null,
+        owner_initials: featureData.owner_initials || null
       }])
       .select();
 

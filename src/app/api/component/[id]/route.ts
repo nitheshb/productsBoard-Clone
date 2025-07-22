@@ -81,14 +81,40 @@ export async function PUT(
       throw checkError;
     }
 
-    // Update the component
+    // Always update all fields, setting to null if not present in the body
+    const updateFields: any = {
+      name: body.name ?? null,
+      status: body.status ?? null,
+      progress: body.progress ?? null,
+      team: body.team ?? null,
+      days: body.days ?? null,
+      startdate: body.startDate ?? body.startdate ?? null,
+      targetdate: body.targetDate ?? body.targetdate ?? null,
+      completedon: body.completedOn ?? body.completedon ?? null,
+      remarks: body.remarks ?? null,
+      version: body.version ?? null,
+      product_id: body.product_id ?? null
+    };
+
+    // Handle date fields with snake_case
+    if (body.startDate !== undefined) {
+      updateFields.startdate = body.startDate;
+    }
+    if (body.targetDate !== undefined) {
+      updateFields.targetdate = body.targetDate;
+    }
+    if (body.completedOn !== undefined) {
+      updateFields.completedon = body.completedOn;
+    }
+
+    // Remove any camelCase date fields
+    delete updateFields.startDate;
+    delete updateFields.targetDate;
+    delete updateFields.completedOn;
+
     const { data, error } = await supabase
       .from('components')
-      .update({
-        name: body.name,
-       
-        product_id: body.product_id // Allow moving to a different product
-      })
+      .update(updateFields)
       .eq('id', id)
       .select();
 
@@ -123,3 +149,4 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete component' }, { status: 500 });
   }
 }
+

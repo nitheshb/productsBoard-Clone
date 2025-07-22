@@ -8,7 +8,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Trash2, MoreVertical } from "lucide-react";
+import { Trash2, MoreVertical, Loader2, Pencil } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Feature } from "@/app/types"; // Assuming this type exists
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +19,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format, parseISO } from "date-fns";
+import { useToast } from "@/app/hooks/use-toast";
+import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 // Enum for status
 enum Status {
@@ -31,6 +35,7 @@ interface FeatureDetailsPageProps {
   isOpen: boolean;
   onClose: () => void;
   onFeatureUpdated?: (updatedFeature: Feature) => void; // Add this prop
+  onFeatureDeleted?: () => void;
 }
 
 function FeatureDetailsTab({
@@ -81,17 +86,20 @@ function DetailsTabContent({
   feature,
   draftFeature,
   editingField,
+  setEditingField,
   editInputRef,
   handleFieldHover,
   handleInputChange,
   handleDateChange,
   handleInputBlur,
   handleInputKeyPress,
-  handleStatusChange,
+  onSave, // <-- new prop
+  saving, // <-- new prop
 }: {
   feature: Feature;
   draftFeature: Feature;
   editingField: keyof Feature | null;
+  setEditingField: React.Dispatch<React.SetStateAction<keyof Feature | null>>;
   editInputRef: React.RefObject<HTMLInputElement>;
   handleFieldHover: (field: keyof Feature) => void;
   handleInputChange: (field: keyof Feature, value: any) => void;
@@ -101,107 +109,106 @@ function DetailsTabContent({
     event: React.KeyboardEvent<HTMLInputElement>,
     field: keyof Feature
   ) => Promise<void>;
-  handleStatusChange: (featureId: string, newStatus: Status) => Promise<void>;
+  onSave: () => Promise<void>;
+  saving: boolean;
 }) {
   // Array of date fields
-  const dateFields = ["startDate", "targetDate", "completedOn"];
+  const dateFields = ["startdate", "targetdate", "completedon"];
 
   return (
-    <div className="mt-4 space-y-3">
-      {/* Status dropdown - positioned at the top */}
-      <div className="flex items-center gap-2">
-        <span className="text-[#30363c] w-32 text-[14px] min-h-[32px] py-2 capitalize min-w-[140px] max-w-[200px]">Status</span>
+    <div className="mt-4 flex flex-col gap-6 w-full">
+      {/* Status field */}
+      <div className="flex items-center gap-8 w-full">
+        <span className="text-black w-40 font-medium text-base">Status</span>
+        <div className="flex-1">
+          {editingField === 'status' ? (
         <select
-          value={draftFeature?.status || feature?.status || Status.TODO}
-          onChange={(e) =>
-            handleStatusChange(feature.id, e.target.value as Status)
-          }
-          className="w-full px-3 h-[32px] border text-[14px] border-gray-300 rounded bg-white"
+              ref={editInputRef as any}
+              value={draftFeature.status || ''}
+              onChange={e => handleInputChange('status', e.target.value)}
+              onBlur={() => handleInputBlur('status')}
+              onKeyDown={e => handleInputKeyPress(e as any, 'status')}
+              className="w-full p-2 border border-gray-300 rounded-md text-base h-10"
         >
-          {Object.values(Status).map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
+              <option value="Todo">Todo</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Blocked">Blocked</option>
         </select>
-      </div>
-
-      {/* Progress field (now showing automatically calculated value) */}
-      <div className="flex items-center gap-2">
-        <span className="text-[#30363c] w-32 text-[14px] min-h-[32px] py-2 capitalize min-w-[140px] max-w-[200px]">Progress</span>
-        <div className="w-full flex items-center">
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div
-              className="bg-[#68b4ff] h-2.5 "
-              style={{ width: `${draftFeature.progress || 0}%` }}
-            ></div>
-          </div>
-          <span className="ml-2">{draftFeature.progress || 0}%</span>
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('status')}>{feature.status || 'Not assigned'}</span>
+          )}
         </div>
       </div>
-
-      {/* Filter out status and progress fields since we're handling them separately above */}
-      {(Object.keys(feature || {}) as (keyof Feature)[])
-        .filter(
-          (key) =>
-            key !== "id" &&
-            key !== "name" &&
-            key !== "created_at" &&
-            key !== "status" &&
-            key !== "progress"
-        )
-        .map((key) => (
-          <div key={key} className="flex items-center gap-2">
-            <span className="text-[#30363c] text-[14px] min-h-[32px] py-2 w-32 capitalize min-w-[140px] max-w-[200px]">
-              {key.replace(/_/g, " ")}
-            </span>
-            <div
-              className="relative w-full"
-              onClick={() => handleFieldHover(key)}
-              onMouseLeave={() =>
-                editingField === key &&
-                editInputRef.current !== document.activeElement &&
-                handleInputBlur(key)
-              }
-            >
-              {editingField === key ? (
-                dateFields.includes(key as string) ? (
-                  // Date input for date fields - using input type="date"
-                  <Input
-                    type="date"
-                    value={formatDateForInput(draftFeature[key] as string)}
-                    onChange={(e) => handleDateChange(key, e.target.value ? new Date(e.target.value).toISOString() : "")}
-                    className="w-full h-[32px] bg-white"
-                  />
-                ) : (
-                  // Regular input for non-date fields
-                  <Input
+      {/* Progress field */}
+      <div className="flex items-center gap-8 w-full">
+        <span className="text-black w-40 font-medium text-base">Progress (%)</span>
+        <div className="flex-1">
+          {editingField === 'progress' ? (
+            <Input
+              ref={editInputRef}
+            type="number"
+            min={0}
+            max={100}
+              value={draftFeature.progress === null || draftFeature.progress === undefined ? '' : draftFeature.progress}
+              onChange={e => handleInputChange('progress', e.target.value)}
+              onBlur={() => handleInputBlur('progress')}
+              onKeyDown={e => handleInputKeyPress(e, 'progress')}
+              className="w-full text-base h-10"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('progress')}>{feature.progress !== undefined && feature.progress !== null ? feature.progress : 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+      {/* Other fields */}
+      {(Object.keys(feature) as (keyof Feature)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'status' && key !== 'progress').map((key) => {
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const isDateField = ['startdate', 'targetdate', 'completedon', 'start_date', 'target_date', 'completed_on'].includes(key.toLowerCase());
+        return (
+            <div key={key} className="flex items-center gap-8 w-full">
+            <span className="text-black w-40 font-medium text-base">{label}</span>
+            <div className="flex-1 relative">
+                {editingField === key ? (
+                isDateField ? (
+                    <Input
                     ref={editInputRef}
-                    type="text"
-                    value={
-                      draftFeature[key] !== null &&
-                      draftFeature[key] !== undefined
-                        ? String(draftFeature[key])
-                        : ""
-                    }
+                      type="date"
+                    value={typeof draftFeature[key] === 'string' ? draftFeature[key].slice(0, 10) : draftFeature[key] ? String(draftFeature[key]).slice(0, 10) : ''}
                     onChange={(e) => handleInputChange(key, e.target.value)}
                     onBlur={() => handleInputBlur(key)}
                     onKeyDown={(e) => handleInputKeyPress(e, key)}
-                    className="w-full h-[32px] bg-white"
-                  />
-                )
-              ) : (
-                <span className="text-[#68707b] text-[12px] capitalize">
-                  {dateFields.includes(key as string) && draftFeature[key]
-                    ? formatDateForDisplay(draftFeature[key] as string)
-                    : draftFeature[key] !== null && draftFeature[key] !== undefined
-                      ? String(draftFeature[key])
-                      : "Not assigned"}
-                </span>
-              )}
+                    className="w-full text-base h-10"
+                    />
+                  ) : (
+                    <Input
+                      ref={editInputRef}
+                      type="text"
+                    value={draftFeature[key] !== null && draftFeature[key] !== undefined ? String(draftFeature[key]) : ''}
+                      onChange={(e) => handleInputChange(key, e.target.value)}
+                      onBlur={() => handleInputBlur(key)}
+                      onKeyDown={(e) => handleInputKeyPress(e, key)}
+                    className="w-full text-base h-10"
+                    />
+                  )
+                ) : (
+                <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField(key)}>{feature[key] !== null && feature[key] !== undefined ? String(feature[key]) : 'Not assigned'}</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+        );
+      })}
+      {/* Save Button */}
+      <div className="flex justify-end mt-8">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center"
+        >
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -271,6 +278,7 @@ export function FeatureDetailsPage({
   isOpen,
   onClose,
   onFeatureUpdated,
+  onFeatureDeleted,
 }: FeatureDetailsPageProps) {
   const [feature, setFeature] = useState<Feature | null>(null);
   const [loading, setLoading] = useState(true);
@@ -280,6 +288,10 @@ export function FeatureDetailsPage({
   const [updatingProgress, setUpdatingProgress] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState("details");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast: showToast } = useToast();
 
   // Helper function to calculate progress based on status
   const calculateProgressFromStatus = (status: Status): number => {
@@ -354,21 +366,14 @@ export function FeatureDetailsPage({
   // Handler for date changes
   const handleDateChange = (field: keyof Feature, value: string) => {
     setDraftFeature((prev) => (prev ? { ...prev, [field]: value } : null));
-    // For dates, we want to save immediately when a date is selected
-    setTimeout(() => {
-      saveChanges();
-    }, 100);
+    // Remove auto-save on date change
+    // setTimeout(() => {
+    //   saveChanges();
+    // }, 100);
   };
 
   const handleInputBlur = async (field: keyof Feature) => {
-    if (
-      editingField === field &&
-      feature &&
-      draftFeature &&
-      feature[field] !== draftFeature[field]
-    ) {
-      await saveChanges();
-    }
+    // Remove auto-save on blur
     setEditingField(null);
   };
 
@@ -376,14 +381,7 @@ export function FeatureDetailsPage({
     event: React.KeyboardEvent<HTMLInputElement>,
     field: keyof Feature
   ) => {
-    if (
-      event.key === "Enter" &&
-      editingField === field &&
-      feature &&
-      draftFeature &&
-      feature[field] !== draftFeature[field]
-    ) {
-      await saveChanges();
+    if (event.key === "Enter") {
       setEditingField(null);
     } else if (event.key === "Escape") {
       setDraftFeature(feature ? { ...feature, id: feature.id || "" } : null); // Revert changes
@@ -393,13 +391,17 @@ export function FeatureDetailsPage({
 
   const saveChanges = async () => {
     if (!draftFeature || !featureId) return;
+    setSaving(true);
     try {
       const response = await fetch(`/api/features/${featureId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          draftFeature: { ...draftFeature },
-          updateComponentProgress: true, // Always update component progress when saving changes
+          ...draftFeature,
+          startDate: draftFeature.startdate,
+          targetDate: draftFeature.targetdate,
+          completedOn: draftFeature.completedon,
+          updateComponentProgress: true,
         }),
       });
       if (!response.ok) {
@@ -409,21 +411,30 @@ export function FeatureDetailsPage({
       const data: Feature = await response.json();
       setFeature(data);
       setDraftFeature(data);
-      console.log("Feature updated successfully");
-
       // Call the callback with updated feature
       if (onFeatureUpdated) {
         onFeatureUpdated(data);
       }
+      toast("Feature updated successfully!");
+      onClose();
+      // Optionally, trigger a UI refresh or parent update here
     } catch (error) {
       console.error("Error updating feature:", error);
       setDraftFeature(feature);
+      toast.error("Error updating feature: " + (error instanceof Error ? error.message : "An unknown error occurred."));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!featureId) return;
-    if (window.confirm("Are you sure you want to delete this feature?")) {
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!featureId) return;
+    setDeleting(true);
       try {
         const response = await fetch(
           `/api/features/${featureId}?updateComponentProgress=true`,
@@ -434,11 +445,14 @@ export function FeatureDetailsPage({
             const errorData = await response.json();
             throw new Error(errorData?.error || `Failed to delete feature`);
           }
-          console.log("Feature deleted successfully");
+      toast("Feature deleted successfully!");
+      if (typeof onFeatureDeleted === 'function') onFeatureDeleted();
+      if (typeof onFeatureUpdated === 'function') onFeatureUpdated({ id: featureId, deleted: true } as any); // Pass a dummy Feature object
           onClose();
         } catch (error) {
-          console.error("Error deleting feature:", error);
-        }
+      toast.error("Error deleting feature: " + (error instanceof Error ? error.message : "An unknown error occurred."));
+    } finally {
+      setDeleting(false);
       }
     };
 
@@ -462,9 +476,9 @@ export function FeatureDetailsPage({
           name: draftFeature?.name,
           team: draftFeature?.team,
           days: draftFeature?.days,
-          startDate: draftFeature?.startDate,
-          targetDate: draftFeature?.targetDate,
-          completedOn: draftFeature?.completedOn,
+          startdate: draftFeature?.startdate,
+          targetdate: draftFeature?.targetdate,
+          completedon: draftFeature?.completedon,
           remarks: draftFeature?.remarks,
           color: draftFeature?.color,
         };
@@ -474,9 +488,9 @@ export function FeatureDetailsPage({
           name: updatedDraft.name || "",
           team: updatedDraft.team || "",
           days: updatedDraft.days || 0,
-          startDate: updatedDraft.startDate || "",
-          targetDate: updatedDraft.targetDate || "",
-          completedOn: updatedDraft.completedOn || "",
+          startdate: updatedDraft.startdate || "",
+          targetdate: updatedDraft.targetdate || "",
+          completedon: updatedDraft.completedon || "",
           remarks: updatedDraft.remarks || "",
           color: updatedDraft.color || "",
           created_at: updatedDraft.created_at || "",
@@ -516,81 +530,65 @@ export function FeatureDetailsPage({
       }
     };
 
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
-    if (!feature || !draftFeature) return <div>No feature found</div>;
+    if (loading) return null;
+    if (error) return null;
+    if (!feature || !draftFeature) return null;
 
     return (
       <div className="">
         <Sheet open={isOpen} onOpenChange={onClose}>
-          <SheetContent className="overflow-y-auto bg-white">
+          <SheetContent className="sm:max-w-2xl w-full max-w-2xl overflow-y-auto p-8 rounded-lg shadow-lg bg-white">
             <SheetHeader className="flex flex-col items-start gap-2">
-              <div className="flex flex-col justify-between w-full">
-                <section className="flex gap-2 flex-row justify-between">
-                  <div className="flex flex-row">
-                    <span className="text-[#ffc600] mt-[2px] mr-[8px]">
-                      {" "}
-                      <svg
-                        height="16px"
-                        width="16px"
-                        viewBox="0 0 16 16"
-                        role="img"
-                        aria-label="FeatureIcon"
-                        className="sc-fQpRED iffMI ui-icon"
-                        data-testid="Status-Switcher-Icon-Detail"
-                      >
-                        <path
-                          fill="currentColor"
-                          d="M1.25 4.85c0-1.26 0-1.89.245-2.371a2.25 2.25 0 0 1 .984-.984c.48-.245 1.11-.245 2.371-.245h6.3c1.26 0 1.89 0 2.371.245.424.216.768.56.984.984.245.48.245 1.11.245 2.371v6.3c0 1.26 0 1.89-.245 2.371-.216.424-.56.768-.984.984-.48.245-1.11.245-2.371.245h-6.3c-1.26 0-1.89 0-2.371-.245a2.25 2.25 0 0 1-.984-.984c-.245-.48-.245-1.11-.245-2.371z"
-                        ></path>
-                      </svg>
-                    </span>
-                    <span className="text-[14px] text-[#68707b]">
-                      {" "}
-                      {draftFeature?.status || feature?.status || Status.TODO}
-                    </span>
+              <div className="flex items-center justify-between w-full mb-2">
+                <div className="relative w-full flex items-center">
+                  <div className="flex-1 flex items-center">
+                    {editingField === 'name' ? (
+                      <Input
+                        ref={editInputRef}
+                        type="text"
+                        value={draftFeature?.name || ''}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        onBlur={() => handleInputBlur('name')}
+                        onKeyDown={(e) => handleInputKeyPress(e, 'name')}
+                        className="w-full text-2xl font-bold border-2 border-blue-200 focus:border-blue-500 bg-blue-50 px-4 py-2 rounded"
+                      />
+                    ) : (
+                      <SheetTitle className="text-2xl font-bold text-blue-900 w-full">{feature?.name}</SheetTitle>
+                    )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => setEditingField('name')}
+                            className="ml-2 p-2 rounded-full bg-gray-100 hover:bg-blue-100 text-blue-600 hover:text-blue-800 transition"
+                            aria-label="Edit feature name"
+                            type="button"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          Edit feature name
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={handleDelete}
+                            className="ml-2 p-2 rounded-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 transition"
+                            aria-label="Delete feature"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          Delete feature
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={4} className="bg-white">
-                      <DropdownMenuItem
-                        onClick={handleDelete}
-                        className="text-red-500 focus:bg-red-100"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete feature
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </section>
-                <div
-                  className="relative w-full flex flex-row justify-between"
-                  onMouseEnter={() => handleFieldHover("name")}
-                  onMouseLeave={() =>
-                    editingField === "name" &&
-                    editInputRef.current !== document.activeElement &&
-                    handleInputBlur("name")
-                  }
-                >
-                  {editingField === "name" ? (
-                    <Input
-                      ref={editInputRef}
-                      type="text"
-                      value={draftFeature.name || ""}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      onBlur={() => handleInputBlur("name")}
-                      onKeyDown={(e) => handleInputKeyPress(e, "name")}
-                      className="w-full text-lg font-semibold bg-white"
-                    />
-                  ) : (
-                    <SheetTitle className="text-lg font-semibold text-[#202428]">
-                      {feature.name}
-                    </SheetTitle>
-                  )}
                 </div>
               </div>
 
@@ -622,13 +620,15 @@ export function FeatureDetailsPage({
                 feature={feature}
                 draftFeature={draftFeature}
                 editingField={editingField}
+                setEditingField={setEditingField}
                 editInputRef={editInputRef}
                 handleFieldHover={handleFieldHover}
                 handleInputChange={handleInputChange}
                 handleDateChange={handleDateChange}
                 handleInputBlur={handleInputBlur}
                 handleInputKeyPress={handleInputKeyPress}
-                handleStatusChange={handleStatusChange}
+                onSave={saveChanges}
+                saving={saving}
               />
             )}
             {activeTab === "insights" && <InsightsTabContent />}
@@ -643,8 +643,23 @@ export function FeatureDetailsPage({
             )}
           </SheetContent>
         </Sheet>
+        <ConfirmationDialog
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          onConfirm={confirmDelete}
+          title="Delete Feature"
+          description="Are you sure you want to delete this feature? This action cannot be undone."
+          confirmText="Delete Feature"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={deleting}
+        />
       </div>
     );
   }
 
   export default FeatureDetailsPage
+
+
+
+

@@ -76,6 +76,11 @@ export async function PUT(
 ) {
   try {
     const { id } = params;
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Check if product exists
@@ -89,29 +94,53 @@ export async function PUT(
       if (checkError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Product not found' }, { status: 404 });
       }
+      console.error('Error checking product existence:', checkError);
       throw checkError;
     }
 
-    // Update the product
+    // Prepare update fields - only update fields that are provided
+    const updateFields: any = {};
+    
+    if (body.name !== undefined) updateFields.name = body.name;
+    if (body.status !== undefined) updateFields.status = body.status;
+    if (body.progress !== undefined) updateFields.progress = body.progress;
+    if (body.version !== undefined) updateFields.version = body.version;
+    if (body.team !== undefined) updateFields.team = body.team;
+    if (body.days !== undefined) updateFields.days = body.days;
+    if (body.startDate !== undefined || body.startdate !== undefined) {
+      updateFields.startdate = body.startDate || body.startdate;
+    }
+    if (body.targetDate !== undefined || body.targetdate !== undefined) {
+      updateFields.targetdate = body.targetDate || body.targetdate;
+    }
+    if (body.completedOn !== undefined || body.completedon !== undefined) {
+      updateFields.completedon = body.completedOn || body.completedon;
+    }
+    if (body.remarks !== undefined) updateFields.remarks = body.remarks;
+    if (body.owner !== undefined) updateFields.owner = body.owner;
+
     const { data, error } = await supabase
       .from('products')
-      .update({
-        name: body.name,
-        status: body.status || null,
-        progress: body.progress !== undefined ? body.progress : null,
-       
-        owner: body.owner,
-       
-      })
+      .update(updateFields)
       .eq('id', id)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating product:', error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: 'Product not found after update' }, { status: 404 });
+    }
 
     return NextResponse.json(data[0]);
   } catch (error) {
-    console.error('Error updating product:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    console.error('Error in PUT /api/product/[id]:', error);
+    return NextResponse.json({ 
+      error: 'Failed to update product',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
@@ -137,3 +166,5 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
   }
 }
+
+

@@ -13,17 +13,19 @@ export const calculateFeatureProgress = (status: string): number => {
   }
 };
 
-export const updateComponentProgressInDb = async (componentId: string, teamFilter: string[] = []) => {
+export const updateComponentProgressInDb = async (componentId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
-
     let query = supabase
       .from('features')
-      .select('status, team')
+      .select('progress, team, version')
       .eq('component_id', componentId);
       
-
     if (teamFilter && teamFilter.length > 0) {
       query = query.in('team', teamFilter);
+    }
+
+    if (versionFilter && versionFilter.length > 0) {
+      query = query.in('version', versionFilter);
     }
 
     const { data: features, error: featuresError } = await query;
@@ -38,12 +40,9 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
       return 0;
     }
 
-    const progressValues = features.map(feature => 
-      calculateFeatureProgress(feature.status || 'Todo')
-    );
-
-    const total = progressValues.reduce((sum, value) => sum + value, 0);
-    const average = Math.round(total / progressValues.length);
+    // Calculate average progress from actual progress values
+    const total = features.reduce((sum, feature) => sum + (feature.progress || 0), 0);
+    const average = Math.round(total / features.length);
 
     await supabase
       .from('components')
@@ -57,24 +56,36 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
   }
 };
 
-export const updateProductProgressInDb = async (productId: string, teamFilter: string[] = []) => {
+export const updateProductProgressInDb = async (productId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
-
-    const { data: components, error: componentsError } = await supabase
+    let componentsQuery = supabase
       .from('components')
-      .select('id')
+      .select('id, progress, version')
       .eq('product_id', productId);
       
-    if (componentsError) throw componentsError;
-    if (!components || components.length === 0) return 0;
-    
+    if (versionFilter && versionFilter.length > 0) {
+      componentsQuery = componentsQuery.in('version', versionFilter);
+    }
 
+    const { data: components, error: componentsError } = await componentsQuery;
+      
+    if (componentsError) throw componentsError;
+    if (!components || components.length === 0) {
+      await supabase
+        .from('products')
+        .update({ progress: 0 })
+        .eq('id', productId);
+      return 0;
+    }
+
+    // First update each component's progress
     const progressPromises = components.map(component => 
-      updateComponentProgressInDb(component.id, teamFilter)
+      updateComponentProgressInDb(component.id, teamFilter, versionFilter)
     );
     
     await Promise.all(progressPromises);
 
+    // Get updated component progress values
     const { data: updatedComponents, error: updatedError } = await supabase
       .from('components')
       .select('progress')
@@ -82,23 +93,26 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
       
     if (updatedError) throw updatedError;
 
-    const componentsWithProgress = updatedComponents.filter(c => c.progress !== null && c.progress !== undefined);
+    const componentsWithProgress = updatedComponents.filter(c => 
+      c.progress !== null && c.progress !== undefined
+    );
     
-    if (componentsWithProgress.length === 0) {
-      await supabase
-        .from('products')
-        .update({ progress: 0 })
-        .eq('id', productId);
-      return 0;
+    let averageProgress = 0;
+    if (componentsWithProgress.length > 0) {
+      const totalProgress = componentsWithProgress.reduce((sum, component) => 
+        sum + (component.progress || 0), 0
+      );
+      averageProgress = Math.round(totalProgress / componentsWithProgress.length);
     }
-    
-    const totalProgress = componentsWithProgress.reduce((sum, component) => sum + (component.progress || 0), 0);
-    const averageProgress = Math.round(totalProgress / componentsWithProgress.length);
 
-    await supabase
+    console.log(`Updating product ${productId} progress to ${averageProgress}%`);
+
+    const { error: updateError } = await supabase
       .from('products')
       .update({ progress: averageProgress })
       .eq('id', productId);
+      
+    if (updateError) throw updateError;
       
     return averageProgress;
   } catch (error) {
@@ -107,17 +121,23 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
   }
 };
 
-export const updateAllProgress = async (teamFilter: string[] = []) => {
+export const updateAllProgress = async (teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
 
-    const { data: products, error } = await supabase
+    let productsQuery = supabase
       .from('products')
-      .select('id');
+      .select('id, version');
+      
+    if (versionFilter && versionFilter.length > 0) {
+      productsQuery = productsQuery.in('version', versionFilter);
+    }
+
+    const { data: products, error } = await productsQuery;
       
     if (error) throw error;
 
     for (const product of products) {
-      await updateProductProgressInDb(product.id, teamFilter);
+      await updateProductProgressInDb(product.id, teamFilter, versionFilter);
     }
     
     return true;

@@ -6,25 +6,54 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Component } from '@/app/types/index';
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 interface CreateComponentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productId: string | null;
+  productId?: string | null; // now optional for update
   onComponentCreated: (component: Component, productId: string) => void;
 }
 
 const CreateComponentModal: React.FC<CreateComponentModalProps> = ({ 
   isOpen, 
   onClose, 
-  productId, 
+  productId = null, 
   onComponentCreated 
 }) => {
   const [formData, setFormData] = useState({
     name: '',
     status: 'Todo',
     progress: 0,
+    version: '1.0.0',
   });
+  const [loading, setLoading] = useState(false);
+
+  // Fetch product data if editing
+  React.useEffect(() => {
+    if (productId && isOpen) {
+      setLoading(true);
+      fetch(`/api/product/${productId}`)
+        .then(res => res.json())
+        .then(data => {
+          setFormData({
+            name: data.name || '',
+            status: data.status || 'Todo',
+            progress: data.progress || 0,
+            version: data.version || '1.0.0',
+          });
+        })
+        .finally(() => setLoading(false));
+    } else if (!productId && isOpen) {
+      setFormData({
+        name: '',
+        status: 'Todo',
+        progress: 0,
+        version: '1.0.0',
+      });
+    }
+  }, [productId, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -36,36 +65,44 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (!productId) {
-      console.error('Product ID is null, cannot create component.');
-      return;
-    }
-
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('components')
-        .insert([{ 
-          name: formData.name, 
-          status: formData.status, 
-          progress: formData.progress, 
-          product_id: productId 
-        }])
-        .select();
-
-      if (error) throw error;
-
+      let data, error;
+      if (productId) {
+        // Update
+        const response = await fetch(`/api/product/${productId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        if (!response.ok) throw new Error('Failed to update product');
+        data = [await response.json()];
+        toast("Product updated successfully!");
+      } else {
+        // Create
+        const response = await fetch('/api/product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        if (!response.ok) throw new Error('Failed to create product');
+        data = [await response.json()];
+        toast("Product created successfully!");
+      }
       if (data && data.length > 0) {
-        onComponentCreated(data[0], productId);
+        onComponentCreated(data[0], data[0].id);
         onClose();
         setFormData({
           name: '',
           status: 'Todo',
           progress: 0,
+          version: '1.0.0',
         });
       }
     } catch (error) {
-      console.error('Error creating component:', error);
+      toast.error("Error creating/updating product: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -75,23 +112,24 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold">Create New Component</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Fill out the form below to create a new component.
+          <h2 className="text-xl font-semibold">{productId ? 'Edit Product' : 'Create New Product'}</h2>
+          <p className="text-black text-sm mt-1">
+            Fill out the form below to {productId ? 'update' : 'create'} a product.
           </p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-4">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Component Name</Label>
+              <Label htmlFor="name">Product Name</Label>
               <Input 
                 id="name" 
                 name="name" 
-                value={formData.name} 
+                value={formData.name || ''} 
                 onChange={handleChange} 
                 required 
                 className="mt-1"
+                disabled={loading}
               />
             </div>
             
@@ -100,9 +138,10 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
               <select
                 id="status"
                 name="status"
-                value={formData.status}
+                value={formData.status || ''}
                 onChange={handleChange}
                 className="mt-1 w-full p-2 border border-gray-300 rounded-md"
+                disabled={loading}
               >
                 <option value="Todo">Todo</option>
                 <option value="In Progress">In Progress</option>
@@ -122,19 +161,32 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
                 min={0}
                 max={100}
                 className="mt-1"
+                disabled={loading}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="version">Version</Label>
+              <Input
+                id="version"
+                name="version"
+                value={formData.version || ''}
+                onChange={handleChange}
+                placeholder="e.g., 1.0.0"
+                className="mt-1"
+                disabled={loading}
               />
             </div>
           </div>
           
-          <div className="flex justify-end gap-2 mt-6">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose}
-            >
+          <div className="mt-8 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit">Create</Button>
+            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? (productId ? 'Updating...' : 'Creating...') : (productId ? 'Update' : 'Create')}
+            </Button>
           </div>
         </form>
       </div>

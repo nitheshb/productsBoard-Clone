@@ -1,253 +1,73 @@
-
-// // import React, { useEffect } from "react";
-// // import {
-// //   Popover,
-// //   PopoverContent,
-// //   PopoverTrigger,
-// // } from "@/components/ui/popover";
-// // import { Button } from "@/components/ui/button";
-// // import { Calendar } from "@/components/ui/calendar";
-// // import { CalendarDays, ChevronDown } from "lucide-react";
-// // import { format } from "date-fns";
-// // import { cn } from "@/lib/utils";
-
-// // interface DateFilterProps {
-// //   startDate: Date | undefined;
-// //   endDate: Date | undefined;
-// //   onDateChange: (startDate: Date | undefined, endDate: Date | undefined) => void;
-// // }
-
-// // export function DateFilter({ startDate, endDate, onDateChange }: DateFilterProps) {
-// //   const [date, setDate] = React.useState<{
-// //     from: Date | undefined;
-// //     to: Date | undefined;
-// //   }>({
-// //     from: startDate || new Date(), // Default to today
-// //     to: endDate,
-// //   });
-
-// //   // Set today's date as default on first render
-// //   useEffect(() => {
-// //     if (!startDate && !endDate) {
-// //       const today = new Date();
-// //       setDate({ from: today, to: undefined });
-// //       onDateChange(today, undefined);
-// //     }
-// //   }, []);
-
-// //   // Update local state when props change
-// //   useEffect(() => {
-// //     if (startDate !== date.from || endDate !== date.to) {
-// //       setDate({
-// //         from: startDate,
-// //         to: endDate,
-// //       });
-// //     }
-// //   }, [startDate, endDate]);
-
-// //   const handleSelect = (selectedDate: any) => {
-// //     setDate(selectedDate);
-// //     onDateChange(selectedDate.from, selectedDate.to);
-// //   };
-
-// //   return (
-// //     <Popover>
-// //       <PopoverTrigger asChild>
-// //         <Button variant="outline" size="sm" className="h-8 gap-1 bg-black">
-// //           <CalendarDays className="h-4 w-4 mr-1" />
-// //           {date.from ? (
-// //             date.to ? (
-// //               <>
-// //                 {format(date.from, "MMM d")} - {format(date.to, "MMM d, yyyy")}
-// //               </>
-// //             ) : (
-// //               format(date.from, "MMM d, yyyy")
-// //             )
-// //           ) : (
-// //             "Select date"
-// //           )}
-// //           <ChevronDown className="h-4 w-4 ml-1" />
-// //         </Button>
-// //       </PopoverTrigger>
-// //       <PopoverContent align="start" className="w-auto p-0 bg-black">
-// //         <Calendar
-// //           mode="range"
-// //           selected={date}
-// //           onSelect={handleSelect}
-// //           initialFocus
-// //           className={cn("p-3 pointer-events-auto")}
-// //         />
-// //       </PopoverContent>
-// //     </Popover>
-// //   );
-// // }
-
-
-
-// import React, { useEffect } from "react";
-// import {
-//   Popover,
-//   PopoverContent,
-//   PopoverTrigger,
-// } from "@/components/ui/popover";
-// import { Button } from "@/components/ui/button";
-// import { Calendar } from "@/components/ui/calendar";
-// import { CalendarDays, ChevronDown } from "lucide-react";
-// import { format } from "date-fns";
-// import { cn } from "@/lib/utils";
-
-// interface DateFilterProps {
-//   startDate: Date | undefined;
-//   endDate: Date | undefined;
-//   onDateChange: (startDate: Date | undefined, endDate: Date | undefined) => void;
-// }
-
-// export function DateFilter({ startDate, endDate, onDateChange }: DateFilterProps) {
-//   const [date, setDate] = React.useState<{
-//     from: Date | undefined;
-//     to: Date | undefined;
-//   }>({
-//     from: startDate || new Date(), // Default to today
-//     to: endDate,
-//   });
-
-//   // Set today's date as default on first render
-//   useEffect(() => {
-//     if (!startDate && !endDate) {
-//       const today = new Date();
-//       setDate({ from: today, to: undefined });
-//       onDateChange(today, undefined);
-//     }
-//   }, []);
-
-//   // Update local state when props change
-//   useEffect(() => {
-//     if (startDate !== date.from || endDate !== date.to) {
-//       setDate({
-//         from: startDate,
-//         to: endDate,
-//       });
-//     }
-//   }, [startDate, endDate]);
-
-//   const handleSelect = (selectedDate: any) => {
-//     setDate(selectedDate);
-//     onDateChange(selectedDate?.from, selectedDate?.to);
-//   };
-
-//   return (
-//     <Popover>
-//       <PopoverTrigger asChild>
-//         <Button variant="outline" size="sm" className="h-8 gap-1">
-//           <CalendarDays className="h-4 w-4 mr-1" />
-//           {date.from ? (
-//             date.to ? (
-//               <>
-//                 {format(date.from, "MMM d")} - {format(date.to, "MMM d, yyyy")}
-//               </>
-//             ) : (
-//               format(date.from, "MMM d, yyyy")
-//             )
-//           ) : (
-//             "Select date"
-//           )}
-//           <ChevronDown className="h-4 w-4 ml-1" />
-//         </Button>
-//       </PopoverTrigger>
-//       <PopoverContent align="start" className="w-auto p-0">
-//         <Calendar
-//           mode="range"
-//           selected={date}
-//           onSelect={handleSelect}
-//           initialFocus
-//           className="p-3 pointer-events-auto"
-//         />
-//       </PopoverContent>
-//     </Popover>
-//   );
-// }
-
-
-
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { ChevronDown, Calendar as CalendarIcon, X } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 interface DateFilterProps {
-  startDate: Date | undefined;
-  endDate: Date | undefined;
-  onDateChange: (startDate: Date | undefined, endDate: Date | undefined) => void;
+  startDate?: Date;
+  endDate?: Date;
+  onDateSelect: (startDate?: Date, endDate?: Date) => void;
 }
 
-export function DateFilter({ startDate, endDate, onDateChange }: DateFilterProps) {
-  const [date, setDate] = React.useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({
-    from: startDate || new Date(), // Default to today
-    to: endDate,
-  });
+export function DateFilter({ startDate, endDate, onDateSelect }: DateFilterProps) {
+  const today = new Date();
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempRange, setTempRange] = useState<[Date | null, Date | null]>([
+    startDate ?? today,
+    endDate ?? today,
+  ]);
 
-  // Set today's date as default on component mount
-  useEffect(() => {
-    if (!startDate && !endDate) {
-      const today = new Date();
-      setDate({ from: today, to: undefined });
-      onDateChange(today, undefined);
-    }
-  }, []);
-
-  // Update local state when props change
-  useEffect(() => {
-    if (startDate !== date.from || endDate !== date.to) {
-      setDate({
-        from: startDate,
-        to: endDate,
-      });
-    }
-  }, [startDate, endDate]);
-
-  const handleSelect = (selectedDate: any) => {
-    setDate(selectedDate);
-    onDateChange(selectedDate.from, selectedDate.to);
+  const handleDateChange = (update: [Date | null, Date | null]) => {
+    setTempRange(update);
+    onDateSelect(update[0] || undefined, update[1] || undefined);
+    setIsOpen(false);
   };
 
+  const getDisplayText = () => {
+    if (startDate && endDate) {
+      return `${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}`;
+    } else if (startDate) {
+      return `From ${format(startDate, 'MMM dd, yyyy')}`;
+    }
+    return "Date Range";
+  };
+
+  const hasActiveFilter = startDate || endDate;
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1 bg-black">
-          <CalendarDays className="h-4 w-4 mr-1" />
-          {date.from ? (
-            date.to ? (
-              <>
-                {format(date.from, "MMM d")} - {format(date.to, "MMM d, yyyy")}
-              </>
-            ) : (
-              format(date.from, "MMM d, yyyy")
-            )
-          ) : (
-            "Select date"
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1 bg-white hover:bg-gray-50 border-gray-300">
+          <CalendarIcon className="h-4 w-4" />
+          {getDisplayText()}
+          {hasActiveFilter && (
+            <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
           )}
-          <ChevronDown className="h-4 w-4 ml-1" />
+          <ChevronDown className="h-4 w-4" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-0 bg-black">
-        <Calendar
-          mode="range"
-          selected={date}
-          onSelect={handleSelect}
-          initialFocus
-          className={cn("p-3 pointer-events-auto")}
-        />
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-auto p-0 bg-white shadow-none border-none">
+        <DropdownMenuLabel className="px-4 py-3 text-sm font-medium text-gray-700 border-b border-gray-200">
+          Select Date Range
+        </DropdownMenuLabel>
+        <div className="flex justify-center">
+          <DatePicker
+            selectsRange
+            startDate={tempRange[0]}
+            endDate={tempRange[1]}
+            onChange={handleDateChange}
+            inline
+          />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

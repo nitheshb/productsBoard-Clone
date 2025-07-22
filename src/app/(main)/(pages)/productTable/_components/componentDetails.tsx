@@ -4,15 +4,21 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Trash2, MoreVertical } from 'lucide-react';
+import { Trash2, MoreVertical, Loader2, Pencil } from 'lucide-react';
 import { Component as ComponentType, Feature } from '@/app/types'; // Assuming these types exist
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useToast } from "@/app/hooks/use-toast";
+import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ComponentDetailsPageProps {
   componentId: string;
   isOpen: boolean;
   onClose: () => void;
+  onComponentDeleted?: () => void;
+  onComponentUpdated?: () => void;
 }
 
 function ComponentDetailsTab({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) {
@@ -28,55 +34,127 @@ function ComponentDetailsTab({ label, isActive, onClick }: { label: string; isAc
   );
 }
 
-function DetailsTabContent({ component, draftComponent, editingField, editInputRef, handleFieldHover, handleInputChange, handleInputBlur, handleInputKeyPress }: {
+function DetailsTabContent({
+  component,
+  draftComponent,
+  editingField,
+  setEditingField,
+  editInputRef,
+  handleFieldHover,
+  handleInputChange,
+  handleInputBlur,
+  handleInputKeyPress,
+  onSave, // <-- new prop
+  saving, // <-- new prop
+}: {
   component: ComponentType;
   draftComponent: ComponentType;
   editingField: keyof ComponentType | null;
+  setEditingField: React.Dispatch<React.SetStateAction<keyof ComponentType | null>>;
   editInputRef: React.RefObject<HTMLInputElement>;
   handleFieldHover: (field: keyof ComponentType) => void;
   handleInputChange: (field: keyof ComponentType, value: any) => void;
   handleInputBlur: (field: keyof ComponentType) => Promise<void>;
   handleInputKeyPress: (event: React.KeyboardEvent<HTMLInputElement>, field: keyof ComponentType) => Promise<void>;
+  onSave: () => Promise<void>;
+  saving: boolean;
 }) {
   return (
-    <div className="mt-4 space-y-3">
-      {(Object.keys(component) as (keyof ComponentType)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'features').map((key) => (
-        <div key={key} className="flex items-center gap-2">
-          <span className="text-gray-500 w-24">{key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}</span>
-          <div
-            className="relative w-full"
-            onMouseEnter={() => handleFieldHover(key)}
-            onMouseLeave={() => editingField === key && editInputRef.current !== document.activeElement && handleInputBlur(key)}
-          >
-            {editingField === key ? (
-              <Input
-                ref={editInputRef}
-                type="text" // Adjust type based on the field if necessary
-                value={draftComponent[key] !== null && draftComponent[key] !== undefined ? String(draftComponent[key]) : ''}
-                onChange={(e) => handleInputChange(key, e.target.value)}
-                onBlur={() => handleInputBlur(key)}
-                onKeyDown={(e) => handleInputKeyPress(e, key)}
-                className="w-full"
-              />
+    <div className="mt-4 flex flex-col gap-6 w-full">
+      {/* Other fields */}
+      <div className="flex flex-col gap-6 w-full">
+        <div className="flex items-center gap-8 w-full">
+          <span className="text-gray-700 w-40 font-medium text-base">Status</span>
+          <div className="flex-1">
+            {editingField === 'status' ? (
+              <select
+                ref={editInputRef as any}
+                value={draftComponent.status || ''}
+                onChange={e => handleInputChange('status', e.target.value)}
+                onBlur={() => handleInputBlur('status')}
+                onKeyDown={e => handleInputKeyPress(e as any, 'status')}
+                className="w-full p-2 border border-gray-300 rounded-md text-base h-10"
+              >
+                <option value="Todo">Todo</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Blocked">Blocked</option>
+              </select>
             ) : (
-              <span>{component[key] !== null && component[key] !== undefined ? String(component[key]) : 'Not assigned'}</span>
+              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('status')}>{component.status || 'Not assigned'}</span>
             )}
           </div>
         </div>
-      ))}
-
-      {component.features && component.features.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Features</h3>
-          <ul className="space-y-1">
-            {component.features.map((feature: Feature) => (
-              <li key={feature.id} className="text-gray-600 p-2 hover:bg-gray-50 rounded-md">
-                {feature.name}
-              </li>
-            ))}
-          </ul>
+      <div className="flex items-center gap-8 w-full">
+          <span className="text-gray-700 w-40 font-medium text-base">Progress (%)</span>
+          <div className="flex-1">
+            {editingField === 'progress' ? (
+              <Input
+                ref={editInputRef}
+              type="number"
+              min={0}
+              max={100}
+                value={draftComponent.progress === null || draftComponent.progress === undefined ? '' : draftComponent.progress}
+                onChange={e => handleInputChange('progress', e.target.value)}
+              onBlur={() => handleInputBlur('progress')}
+              onKeyDown={e => handleInputKeyPress(e, 'progress')}
+                className="w-full text-base h-10"
+            />
+            ) : (
+              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('progress')}>{component.progress !== undefined && component.progress !== null ? component.progress : 'Not assigned'}</span>
+            )}
+          </div>
         </div>
-      )}
+      </div>
+      <div className="flex flex-col gap-6 w-full">
+        {(Object.keys(component) as (keyof ComponentType)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'features' && key !== 'progress' && key !== 'status').map((key) => {
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const isDateField = (key: string) => ['startdate', 'targetdate', 'completedon'].includes(key);
+          return (
+          <div key={key} className="flex items-center gap-8 w-full">
+              <span className="text-gray-700 w-40 font-medium text-base">{label}</span>
+              <div className="flex-1 relative">
+              {editingField === key ? (
+                  isDateField(key) ? (
+                    <Input
+                      ref={editInputRef}
+                      type="date"
+                      value={typeof draftComponent[key] === 'string' ? draftComponent[key].slice(0, 10) : draftComponent[key] ? String(draftComponent[key]).slice(0, 10) : ''}
+                      onChange={(e) => handleInputChange(key, e.target.value)}
+                      onBlur={() => handleInputBlur(key)}
+                      onKeyDown={(e) => handleInputKeyPress(e, key)}
+                      className="w-full text-base h-10"
+                    />
+                  ) : (
+                <Input
+                  ref={editInputRef}
+                  type="text"
+                  value={draftComponent[key] !== null && draftComponent[key] !== undefined ? String(draftComponent[key]) : ''}
+                  onChange={(e) => handleInputChange(key, e.target.value)}
+                  onBlur={() => handleInputBlur(key)}
+                  onKeyDown={(e) => handleInputKeyPress(e, key)}
+                      className="w-full text-base h-10"
+                />
+                  )
+              ) : (
+                  <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField(key)}>{component[key] !== null && component[key] !== undefined ? String(component[key]) : 'Not assigned'}</span>
+              )}
+            </div>
+          </div>
+          );
+        })}
+      </div>
+      {/* Save Button */}
+      <div className="flex justify-end mt-8">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center"
+        >
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -89,7 +167,7 @@ function PortalTabContent() {
   return <div>Content for Component Portal tab</div>;
 }
 
-export function ComponentDetailsPage({ componentId, isOpen, onClose }: ComponentDetailsPageProps) {
+export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponentDeleted, onComponentUpdated }: ComponentDetailsPageProps) {
   const [component, setComponent] = useState<ComponentType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +175,10 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
   const [draftComponent, setDraftComponent] = useState<ComponentType | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('details');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast: showToast } = useToast();
 
   useEffect(() => {
     if (isOpen && componentId) {
@@ -152,15 +234,12 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
   };
 
   const handleInputBlur = async (field: keyof ComponentType) => {
-    if (editingField === field && component && draftComponent && component[field] !== draftComponent[field]) {
-      await saveChanges();
-    }
+    // Remove auto-save on blur
     setEditingField(null);
   };
 
   const handleInputKeyPress = async (event: React.KeyboardEvent<HTMLInputElement>, field: keyof ComponentType) => {
-    if (event.key === 'Enter' && editingField === field && component && draftComponent && component[field] !== draftComponent[field]) {
-      await saveChanges();
+    if (event.key === 'Enter') {
       setEditingField(null);
     } else if (event.key === 'Escape') {
       setDraftComponent(component ? { ...component, id: component.id || '' } : null); // Revert changes
@@ -170,11 +249,18 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
 
   const saveChanges = async () => {
     if (!draftComponent || !componentId) return;
+    setSaving(true);
     try {
       const response = await fetch(`/api/component/${componentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draftComponent),
+        body: JSON.stringify({
+          ...draftComponent,
+          startDate: draftComponent.startdate,
+          targetDate: draftComponent.targetdate,
+          completedOn: draftComponent.completedon,
+          updateProductProgress: true,
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -183,19 +269,30 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
       const data: ComponentType = await response.json();
       setComponent(data);
       setDraftComponent(data);
+      // Optionally, trigger a UI refresh or parent update here
+      toast("Component updated successfully!");
+      if (typeof onComponentUpdated === 'function') onComponentUpdated();
+      onClose();
     } catch (error) {
       console.error('Error updating component:', error);
       if (error instanceof Error) {
-        alert('Error updating component: ' + error.message);
+        toast.error("Error updating component: " + error.message);
       } else {
-        alert('Error updating component: An unknown error occurred.');
+        toast.error("Error updating component: An unknown error occurred.");
       }
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!componentId) return;
-    if (window.confirm('Are you sure you want to delete this component?')) {
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!componentId) return;
+    setDeleting(true);
       try {
         const response = await fetch(`/api/component/${componentId}`, {
           method: 'DELETE',
@@ -204,16 +301,17 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
           const errorData = await response.json();
           throw new Error(errorData?.error || `Failed to delete component`);
         }
-        alert('Component deleted successfully!');
+      toast("Component deleted successfully!");
+      if (typeof onComponentDeleted === 'function') onComponentDeleted();
         onClose();
       } catch (error) {
-        console.error('Error deleting component:', error);
         if (error instanceof Error) {
-          alert('Error deleting component: ' + error.message);
+        toast.error("Error deleting component: " + error.message);
         } else {
-          alert('Error deleting component: An unknown error occurred.');
-        }
+        toast.error("Error deleting component: An unknown error occurred.");
       }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -222,23 +320,19 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
   };
 
   if (!isOpen) return null;
+  if (loading) return null;
+  if (error) return null;
+  if (!component || !draftComponent) return null;
 
   return (
     <div className="p-6">
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader className="flex flex-col items-start gap-2">
-            <div className="flex items-center justify-between w-full">
-              <div
-                className="relative w-full"
-                onMouseEnter={() => handleFieldHover('name')}
-                onMouseLeave={() => editingField === 'name' && editInputRef.current !== document.activeElement && handleInputBlur('name')}
-              >
-                {loading ? (
-                  <div className="animate-pulse h-6 w-2/3 bg-gray-200 rounded"></div>
-                ) : error ? (
-                  <div className="text-red-500">Error loading component</div>
-                ) : editingField === 'name' ? (
+        <SheetContent className="sm:max-w-2xl w-full max-w-2xl overflow-y-auto p-8 rounded-lg shadow-lg">
+          <SheetHeader className="flex flex-col items-start gap-4 mb-4">
+            <div className="flex items-center justify-between w-full mb-2">
+              <div className="relative w-full flex items-center">
+                <div className="flex-1 flex items-center">
+                  {editingField === 'name' ? (
                   <Input
                     ref={editInputRef}
                     type="text"
@@ -246,30 +340,49 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     onBlur={() => handleInputBlur('name')}
                     onKeyDown={(e) => handleInputKeyPress(e, 'name')}
-                    className="w-full text-lg font-semibold"
+                    className="w-full text-2xl font-bold border-2 border-blue-200 focus:border-blue-500 bg-blue-50 px-4 py-2 rounded"
                   />
                 ) : (
-                  <SheetTitle className="text-lg font-semibold">{component?.name}</SheetTitle>
+                    <SheetTitle className="text-2xl font-bold text-blue-900 w-full">{component?.name}</SheetTitle>
                 )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setEditingField('name')}
+                          className="ml-2 p-2 rounded-full bg-gray-100 hover:bg-blue-100 text-blue-600 hover:text-blue-800 transition"
+                          aria-label="Edit component name"
+                          type="button"
+                        >
+                          <Pencil className="h-5 w-5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="center">
+                        Edit component name
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={handleDelete}
+                          className="ml-2 p-2 rounded-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 transition"
+                          aria-label="Delete component"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="center">
+                        Delete component
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" sideOffset={4}>
-                  <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:bg-red-100">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete component
-                  </DropdownMenuItem>
-                  {/* Add other dropdown menu items here if needed */}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
-
             {/* Tab Navigation */}
-            <div className="mt-2 border-b">
+            <div className="mt-2 border-b w-full flex gap-6">
               <ComponentDetailsTab
                 label="Details"
                 isActive={activeTab === 'details'}
@@ -307,11 +420,14 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
               component={component}
               draftComponent={draftComponent}
               editingField={editingField}
+              setEditingField={setEditingField}
               editInputRef={editInputRef}
               handleFieldHover={handleFieldHover}
               handleInputChange={handleInputChange}
               handleInputBlur={handleInputBlur}
               handleInputKeyPress={handleInputKeyPress}
+              onSave={saveChanges}
+              saving={saving}
             />
           ) : (
             <div className="mt-4">No component data available</div>
@@ -320,8 +436,22 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose }: Component
           {activeTab === 'portal' && <PortalTabContent />}
         </SheetContent>
       </Sheet>
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={confirmDelete}
+        title="Delete Component"
+        description="Are you sure you want to delete this component? This action cannot be undone."
+        confirmText="Delete Component"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deleting}
+      />
     </div>
   );
 }
 
 export default ComponentDetailsPage;
+
+
+
