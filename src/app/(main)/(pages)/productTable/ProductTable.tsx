@@ -1645,7 +1645,19 @@
 //                       {item.data.days !== undefined ? item.data.days : "-"}
 //                     </TableCell>
 //                     <TableCell className="w-[180px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-//                       {item.data.startdate || ""}-{item.data.targetdate || ""}
+//                       {(() => {
+//                         const startDate = item.data.startdate;
+//                         const endDate = item.data.targetdate;
+                        
+//                         if (startDate && endDate) {
+//                           return `${startDate} to ${endDate}`;
+//                         } else if (startDate) {
+//                           return startDate;
+//                         } else if (endDate) {
+//                           return `to ${endDate}`;
+//                         }
+//                         return "-";
+//                       })()}
 //                     </TableCell>
 //                     <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
 //                       {item.data.completedon || "-"}
@@ -1792,9 +1804,8 @@ export default function ProductTable({
   const [allTableData, setAllTableData] = useState<TableItem[]>([]);
   const [tableData, setTableData] = useState<TableItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [featureStatusFilter, setFeatureStatusFilter] = useState<string[]>([]);
   const [isCreateComponentModalOpen, setIsCreateComponentModalOpen] =
     useState(false);
   const [selectedProductIdForComponent, setSelectedProductIdForComponent] =
@@ -1959,7 +1970,7 @@ export default function ProductTable({
     }
   };
   // Apply all filters
-  function filterTableData(baseData = allTableData) {
+  async function filterTableData(baseData = allTableData) {
     let filtered = [...baseData];
     
     // Filter by selected product IDs
@@ -1971,30 +1982,85 @@ export default function ProductTable({
 
     // Apply team filter to features
     if (teamFilter && teamFilter.length > 0) {
+      // First, load all features for all components to apply proper filtering
+      const newExpandedItems: Record<string, boolean> = {};
+      
+      for (const product of filtered) {
+        if (product.children && product.children.length > 0) {
+          for (const component of product.children) {
+            if (!component.children || component.children.length === 0) {
+              // Load features for this component
+              const features = await fetchFeatures(component.id);
+              component.children = features as TableItem[];
+            }
+          }
+        }
+      }
+
+      // Now apply the team filter to the nested structure
       filtered = filtered.map(product => {
-        // Apply team filter to nested data structure
         return applyNestedTeamFilter(product, teamFilter);
       }).filter(product => {
         // Remove products with no matching components/features after team filtering
-        if (!product?.children || !Array.isArray(product.children)) return true;
+        if (!product || !product?.children || !Array.isArray(product.children)) return false;
         return product.children.length > 0;
       });
+
+      // Auto-expand products and components that have matching features
+      for (const product of filtered) {
+        if (product && product.children && product.children.length > 0) {
+          newExpandedItems[`product-${product.id}`] = true;
+          
+          for (const component of product.children) {
+            if (component && component.children && component.children.length > 0) {
+              newExpandedItems[`component-${component.id}`] = true;
+            }
+          }
+        }
+      }
+      
+      setExpandedItems(prev => ({ ...prev, ...newExpandedItems }));
     }
 
-    // Apply status filter to products (not features)
+    // Apply status filter to products (not features) - REMOVED FEATURE STATUS FILTERING
     if (statusFilter && statusFilter.length > 0) {
       filtered = filtered.filter(product => typeof product.data.status === "string" && statusFilter.includes(product.data.status));
 
-      // Auto-expand all products that match the filter
+      // Auto-expand all products that match the filter and load their data
       const newExpandedItems: Record<string, boolean> = {};
-      filtered.forEach(product => {
+      for (const product of filtered) {
         newExpandedItems[`product-${product.id}`] = true;
-        if (product.children && Array.isArray(product.children)) {
-          product.children.forEach(component => {
-            newExpandedItems[`component-${component.id}`] = true;
-          });
+        
+        // Load components if not already loaded
+        if (!product.children || product.children.length === 0) {
+          const components = await fetchComponents(product.id);
+          product.children = components as TableItem[];
         }
-      });
+        
+        if (product.children && Array.isArray(product.children)) {
+          for (const component of product.children) {
+            newExpandedItems[`component-${component.id}`] = true;
+            
+            // Load features if not already loaded
+            if (!component.children || component.children.length === 0) {
+              const features = await fetchFeatures(component.id);
+              component.children = features as TableItem[];
+            }
+          }
+        }
+      }
+      
+      // Apply team filter after loading all data if team filter is active
+      if (teamFilter && teamFilter.length > 0) {
+        filtered = filtered.map(product => {
+          return applyNestedTeamFilter(product, teamFilter);
+        }).filter(product => {
+          // Remove products with no matching components/features after team filtering
+          if (!product?.children || !Array.isArray(product.children)) return true;
+          return product.children.length > 0;
+        });
+      }
+      
       setExpandedItems(prev => ({ ...prev, ...newExpandedItems }));
     }
 
@@ -2047,22 +2113,28 @@ export default function ProductTable({
       if (teams.includes(item.data.team || "")) {
         return item;
       }
-      return null as unknown as TableItem; // Ensure type compatibility
+      return null as unknown as TableItem;
     }
     
-    // If it has children, filter them
+    // If it has children, filter them recursively
     if (item.children && Array.isArray(item.children)) {
       const filteredChildren = item.children
         .map(child => applyNestedTeamFilter(child, teams))
         .filter(Boolean);
       
-      return {
-        ...item,
-        children: filteredChildren.length > 0 ? filteredChildren : undefined
-      };
+      // Only return the item if it has matching children
+      if (filteredChildren.length > 0) {
+        return {
+          ...item,
+          children: filteredChildren
+        };
+      }
+      
+      // For products and components, if no children match, don't show them
+      return null as unknown as TableItem;
     }
     
-    // If no children and not a feature, keep as is
+    // If no children and not a feature, keep as is (shouldn't happen in normal flow)
     return item;
   }
   // Helper function to apply status filter to nested structure
@@ -2226,76 +2298,33 @@ export default function ProductTable({
   // Recalculate progress for products and components based on team and version selection
   async function recalculateProgress() {
     try {
-      // Update all progress in the database first
-      await updateAllProgress(teamFilter, versionFilter);
-      
-      // Now refresh the data in the UI
+      // Just refresh the data without updating progress in database
       const productIds = tableData
         .filter(item => item.type === "product")
         .map(item => item.id);
-      
-      // Get the updated product data
+
       if (productIds.length > 0) {
-        const { data: updatedProducts, error } = await supabase
+        const { data: updatedProducts } = await supabase
           .from("products")
           .select("*")
           .in("id", productIds);
-        
-        if (error) throw error;
-        
-        // Update products in the UI
+
         if (updatedProducts) {
-          setTableData(prevData => 
+          setTableData(prevData =>
             prevData.map(item => {
               if (item.type === "product") {
                 const updatedProduct = updatedProducts.find(p => p.id === item.id);
                 if (updatedProduct) {
-                  return {
-                    ...item,
-                    data: updatedProduct
-                  };
+                  return { ...item, data: updatedProduct };
                 }
               }
               return item;
             })
           );
         }
-        
-        // Also refresh component data in the expanded products
-        for (const productId of productIds) {
-          if (expandedItems[`product-${productId}`]) {
-            const { data: updatedComponents, error: componentsError } = await supabase
-              .from("components")
-              .select("*")
-              .eq("product_id", productId);
-            
-            if (!componentsError && updatedComponents) {
-              setTableData(prevData => 
-                prevData.map(item => {
-                  if (item.id === productId && item.children) {
-                    return {
-                      ...item,
-                      children: item.children.map(child => {
-                        const updatedComponent = updatedComponents.find(c => c.id === child.id);
-                        if (updatedComponent) {
-                          return {
-                            ...child,
-                            data: updatedComponent
-                          };
-                        }
-                        return child;
-                      })
-                    };
-                  }
-                  return item;
-                })
-              );
-            }
-          }
-        }
       }
     } catch (error) {
-      console.error("Error recalculating progress:", error);
+      console.error('Error refreshing data:', error);
     }
   }
 
@@ -2327,11 +2356,26 @@ export default function ProductTable({
 
   // Helper function to apply date filter to nested structure
   function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): TableItem | null {
-    // Check if the item's startdate is within the range
+    // Check if the item's date range overlaps with the filter range
     const itemStart = item.data.startdate ? new Date(item.data.startdate) : null;
+    const itemEnd = item.data.targetdate ? new Date(item.data.targetdate) : null;
+    
     let selfMatches = false;
-    if (itemStart) {
-      selfMatches = (!start || itemStart >= start) && (!end || itemStart <= end);
+    
+    if (itemStart || itemEnd) {
+      // If we have filter dates, check for overlap
+      if (start || end) {
+        const filterStart = start || new Date('1900-01-01');
+        const filterEnd = end || new Date('2100-12-31');
+        const rangeStart = itemStart || itemEnd;
+        const rangeEnd = itemEnd || itemStart;
+        
+        // Check if ranges overlap: item range overlaps with filter range
+        selfMatches = !!(rangeStart && rangeEnd && 
+                        rangeStart <= filterEnd && rangeEnd >= filterStart);
+      } else {
+        selfMatches = true; // No filter, include all items with dates
+      }
     }
 
     // Filter children recursively
@@ -2342,16 +2386,14 @@ export default function ProductTable({
         .filter((child): child is TableItem => child !== null);
     }
 
-    const hasMatchingChildren = filteredChildren.length > 0;
-
-    // Keep the item if it matches or has matching children
-    if (selfMatches || hasMatchingChildren) {
+    // Include item if it matches or has matching children
+    if (selfMatches || filteredChildren.length > 0) {
       return {
         ...item,
-        children: filteredChildren
+        children: filteredChildren.length > 0 ? filteredChildren : item.children
       };
     }
-    
+
     return null;
   }
   const handleProductUpdate = (updatedProduct: Product) => {
@@ -2681,27 +2723,27 @@ export default function ProductTable({
           });
         }
       } else if (type === "component") {
-        // Find the component and check if it needs features loaded
         let componentFound = false;
         let productId = null;
+        let componentHasFeatures = false;
         
-        // First, find which product contains this component
-        for (const product of tableData) {
+        tableData.forEach((product) => {
           if (product.children) {
-            const component = product.children.find(comp => comp.id === id);
-            if (component) {
+            const componentIndex = product.children.findIndex(
+              (comp) => comp.id === id
+            );
+            if (componentIndex >= 0) {
               componentFound = true;
               productId = product.id;
-              // Check if features are already loaded
-              if (!component.children || component.children.length === 0) {
-                break;
-              }
+              // Check if component already has features loaded
+              componentHasFeatures = !!(product.children[componentIndex].children && 
+                                   product.children[componentIndex].children!.length > 0);
             }
           }
-        }
+        });
 
-        if (componentFound && productId) {
-          // Set loading state
+        if (componentFound && productId && !componentHasFeatures) {
+          // Set loading state only if features aren't already loaded
           setLoadingItems(prev => new Set(prev).add(`component-${id}`));
           
           console.log(`Fetching features for component: ${id}`);
@@ -2722,8 +2764,8 @@ export default function ProductTable({
             })
           );
 
-          setAllTableData((prevData) =>
-            prevData.map((product) => {
+          setAllTableData((prevAllData) =>
+            prevAllData.map((product) => {
               if (product.children) {
                 return {
                   ...product,
@@ -2735,8 +2777,8 @@ export default function ProductTable({
               return product;
             })
           );
-          
-          // Clear loading state
+
+          // Remove loading state
           setLoadingItems(prev => {
             const newSet = new Set(prev);
             newSet.delete(`component-${id}`);
@@ -2931,7 +2973,19 @@ export default function ProductTable({
             {child.data.days !== undefined ? child.data.days : "-"}
           </TableCell>
           <TableCell className="w-[180px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {child.data.startdate || ""}-{child.data.targetdate || ""}
+            {(() => {
+              const startDate = child.data.startdate;
+              const endDate = child.data.targetdate;
+              
+              if (startDate && endDate) {
+                return `${startDate} to ${endDate}`;
+              } else if (startDate) {
+                return startDate;
+              } else if (endDate) {
+                return `to ${endDate}`;
+              }
+              return "-";
+            })()}
           </TableCell>
           <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
             {child.data.completedon || "-"}
@@ -3084,10 +3138,18 @@ export default function ProductTable({
 
         {selectedComponent && (
           <ComponentDetailsPage
-            componentId={selectedComponent?.id || ''}
+            componentId={selectedComponent.data.id}
             isOpen={isComponentDetailOpen}
             onClose={handleCloseComponentDetails}
-            onComponentUpdated={fetchProducts}
+            onComponentUpdated={() => {
+              // Refresh the data after component update
+              fetchProducts();
+            }}
+            onComponentDeleted={() => {
+              // Refresh the data after component deletion
+              fetchProducts();
+              handleCloseComponentDetails();
+            }}
           />
         )}
 
@@ -3309,7 +3371,19 @@ export default function ProductTable({
                       {item.data.days !== undefined ? item.data.days : "-"}
                     </TableCell>
                     <TableCell className="w-[180px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {item.data.startdate || ""}-{item.data.targetdate || ""}
+                      {(() => {
+                        const startDate = item.data.startdate;
+                        const endDate = item.data.targetdate;
+                        
+                        if (startDate && endDate) {
+                          return `${startDate} to ${endDate}`;
+                        } else if (startDate) {
+                          return startDate;
+                        } else if (endDate) {
+                          return `to ${endDate}`;
+                        }
+                        return "-";
+                      })()}
                     </TableCell>
                     <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
                       {item.data.completedon || "-"}
@@ -3373,6 +3447,9 @@ export default function ProductTable({
     </div>
   );
 }
+
+
+
 
 
 

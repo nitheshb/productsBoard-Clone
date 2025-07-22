@@ -63,9 +63,10 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
       .select('id, progress, version')
       .eq('product_id', productId);
       
-    if (versionFilter && versionFilter.length > 0) {
-      componentsQuery = componentsQuery.in('version', versionFilter);
-    }
+    // Remove version filter - always calculate from ALL components
+    // if (versionFilter && versionFilter.length > 0) {
+    //   componentsQuery = componentsQuery.in('version', versionFilter);
+    // }
 
     const { data: components, error: componentsError } = await componentsQuery;
       
@@ -78,9 +79,9 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
       return 0;
     }
 
-    // First update each component's progress
+    // First update each component's progress (without filters)
     const progressPromises = components.map(component => 
-      updateComponentProgressInDb(component.id, teamFilter, versionFilter)
+      updateComponentProgressInDb(component.id, [], [])
     );
     
     await Promise.all(progressPromises);
@@ -123,21 +124,16 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
 
 export const updateAllProgress = async (teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
-
-    let productsQuery = supabase
+    const productsQuery = supabase
       .from('products')
       .select('id, version');
       
-    if (versionFilter && versionFilter.length > 0) {
-      productsQuery = productsQuery.in('version', versionFilter);
-    }
-
     const { data: products, error } = await productsQuery;
       
     if (error) throw error;
 
     for (const product of products) {
-      await updateProductProgressInDb(product.id, teamFilter, versionFilter);
+      await updateProductProgressInDb(product.id, [], []);
     }
     
     return true;

@@ -463,16 +463,13 @@ export function FeatureDetailsPage({
     const handleStatusChange = async (featureId: string, newStatus: string) => {
       setUpdatingProgress(true);
       try {
-        // Calculate progress based on status
-        const statusProgress = calculateProgressFromStatus(newStatus as Status);
-
-        // Update local state for better UX
+        // Update local state - keep existing progress, don't calculate from status
         const updatedDraft = {
           ...draftFeature,
           id: draftFeature?.id || featureId,
           component_id: draftFeature?.component_id || "",
           status: newStatus as Status,
-          progress: statusProgress,
+          progress: draftFeature?.progress || 0, // Keep existing progress
           name: draftFeature?.name,
           team: draftFeature?.team,
           days: draftFeature?.days,
@@ -502,7 +499,7 @@ export function FeatureDetailsPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             status: newStatus,
-            progress: statusProgress,
+            progress: draftFeature?.progress, // Use existing progress
             updateComponentProgress: true, // Always update component progress when status changes
           }),
         });
@@ -659,6 +656,7 @@ export function FeatureDetailsPage({
   }
 
   export default FeatureDetailsPage
+
 
 
 

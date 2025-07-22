@@ -19,7 +19,6 @@ interface TeamFilterProps {
 }
 
 export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: TeamFilterProps) {
-  const [customTeam, setCustomTeam] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   const handleTeamToggle = (team: string) => {
@@ -28,19 +27,6 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
       : [...selectedTeams, team];
 
     onTeamSelect(updatedTeams);
-  };
-
-  const handleAddCustomTeam = () => {
-    if (customTeam.trim() && !availableTeams.includes(customTeam)) {
-      onTeamSelect([...selectedTeams, customTeam]);
-      setCustomTeam("");
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleAddCustomTeam();
-    }
   };
 
   return (
@@ -57,26 +43,6 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
           Select Teams
         </DropdownMenuLabel>
         
-        <div className="p-3 border-b border-gray-200">
-          <div className="flex gap-2">
-            <Input
-              value={customTeam}
-              onChange={(e) => setCustomTeam(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Add team name"
-              className="h-8 text-sm"
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-8 px-2"
-              onClick={handleAddCustomTeam}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-        
         <div className="max-h-48 overflow-y-auto">
           {availableTeams.map((team) => (
             <DropdownMenuCheckboxItem
@@ -86,7 +52,7 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
                 e.preventDefault();
                 handleTeamToggle(team);
               }}
-              className="px-3 py-2 text-sm"
+              className="px-3 py-2 text-sm pl-8"
             >
               {team}
             </DropdownMenuCheckboxItem>
@@ -101,29 +67,13 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
                   e.preventDefault();
                   handleTeamToggle(team);
                 }}
-                className="px-3 py-2 text-sm text-blue-600"
+                className="px-3 py-2 text-sm text-blue-600 pl-8"
               >
                 {team} (custom)
               </DropdownMenuCheckboxItem>
             )
           )}
         </div>
-        
-        {selectedTeams.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="p-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onTeamSelect([])}
-                className="w-full text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                Clear All
-              </Button>
-            </div>
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -297,7 +297,6 @@ export async function POST(request: NextRequest) {
       featureData.progress = calculateProgressFromStatus(featureData.status);
     }
 
-    // Insert the new feature
     const { data, error } = await supabase
       .from('features')
       .insert([{
@@ -311,30 +310,18 @@ export async function POST(request: NextRequest) {
         targetdate: featureData.targetDate || null,
         completedon: featureData.completedOn || null,
         remarks: featureData.remarks || null,
-        version: featureData.version || '1.0.0',
+        owner_initials: featureData.owner_initials || null,
         color: featureData.color || null,
-        owner_initials: featureData.owner_initials || null
+        version: featureData.version || '1.0.0'
       }])
       .select();
 
     if (error) {
-      console.error('Database error inserting feature:', error);
-      throw error;
+      console.error('Error creating feature:', error);
+      throw new Error(`Supabase error: ${error.message}`);
     }
 
     console.log('Feature created successfully:', data[0]);
-
-    // Always update component progress when creating a new feature
-    if (shouldUpdateComponentProgress) {
-      console.log(`Updating progress for component ${featureData.component_id}`);
-      try {
-        await updateComponentProgress(featureData.component_id);
-        console.log('Component and product progress updated successfully');
-      } catch (progressError) {
-        console.error('Error updating progress:', progressError);
-        // Don't fail the request if progress update fails
-      }
-    }
 
     return NextResponse.json(data[0]);
   } catch (error: any) {

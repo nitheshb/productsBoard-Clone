@@ -67,7 +67,7 @@ export function StatusFilter({ selectedStatuses, onStatusSelect }: StatusFilterP
                   e.preventDefault();
                   handleStatusToggle(status.value);
                 }}
-                className="px-3 py-2 text-sm"
+                className="px-3 py-2 text-sm pl-8"
               >
                 <div className="flex items-center gap-2">
                   <IconComponent className={`h-4 w-4 ${status.color}`} />

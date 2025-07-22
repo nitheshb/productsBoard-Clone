@@ -100,7 +100,7 @@ export function VersionFilter({ selectedVersions, onVersionSelect, availableVers
                 e.preventDefault();
                 handleVersionToggle(version);
               }}
-              className="px-3 py-2 text-sm"
+              className="px-3 py-2 text-sm pl-8"
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
@@ -119,7 +119,7 @@ export function VersionFilter({ selectedVersions, onVersionSelect, availableVers
                   e.preventDefault();
                   handleVersionToggle(version);
                 }}
-                className="px-3 py-2 text-sm text-blue-600"
+                className="px-3 py-2 text-sm text-blue-600 pl-8"
               >
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs bg-blue-100 px-2 py-1 rounded">

@@ -132,14 +132,24 @@ export function CreateFeatureModal({
     }
   };
 
-  // Update progress when status changes
+  // Update progress when status changes - REMOVE THIS FUNCTION
+  // const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  //   const newStatus = e.target.value;
+  //   const newProgress = calculateProgressFromStatus(newStatus);
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     status: newStatus,
+  //     progress: newProgress
+  //   }));
+  // };
+
+  // Replace with simple status change
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    const newProgress = calculateProgressFromStatus(newStatus);
     setFormData(prev => ({
       ...prev,
-      status: newStatus,
-      progress: newProgress
+      status: newStatus
+      // Don't automatically update progress
     }));
   };
 
