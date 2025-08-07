@@ -9,14 +9,14 @@ import { Component } from '@/app/types/index';
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-interface CreateComponentModalProps {
+interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   productId?: string | null; // now optional for update
-  onComponentCreated: (component: Component, productId: string) => void;
+  onComponentCreated: (product: any, productId: string) => void;
 }
 
-const CreateComponentModal: React.FC<CreateComponentModalProps> = ({ 
+const CreateProductModal: React.FC<CreateProductModalProps> = ({ 
   isOpen, 
   onClose, 
   productId = null, 
@@ -27,6 +27,7 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
     status: 'Todo',
     progress: 0,
     version: '1.0.0',
+    description: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +43,7 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
             status: data.status || 'Todo',
             progress: data.progress || 0,
             version: data.version || '1.0.0',
+            description: data.description || '',
           });
         })
         .finally(() => setLoading(false));
@@ -51,6 +53,7 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
         status: 'Todo',
         progress: 0,
         version: '1.0.0',
+        description: '',
       });
     }
   }, [productId, isOpen]);
@@ -97,6 +100,7 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
           status: 'Todo',
           progress: 0,
           version: '1.0.0',
+          description: '',
         });
       }
     } catch (error) {
@@ -177,6 +181,19 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
                 disabled={loading}
               />
             </div>
+            
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                name="description"
+                value={formData.description || ''}
+                onChange={handleChange}
+                placeholder="Enter product description"
+                className="mt-1"
+                disabled={loading}
+              />
+            </div>
           </div>
           
           <div className="mt-8 flex justify-end gap-2">
@@ -194,4 +211,4 @@ const CreateComponentModal: React.FC<CreateComponentModalProps> = ({
   );
 };
 
-export default CreateComponentModal;
+export default CreateProductModal;

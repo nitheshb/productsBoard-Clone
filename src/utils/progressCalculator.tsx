@@ -106,7 +106,6 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
       averageProgress = Math.round(totalProgress / componentsWithProgress.length);
     }
 
-    console.log(`Updating product ${productId} progress to ${averageProgress}%`);
 
     const { error: updateError } = await supabase
       .from('products')

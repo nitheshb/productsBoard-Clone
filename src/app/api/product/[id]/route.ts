@@ -117,6 +117,7 @@ export async function PUT(
       updateFields.completedon = body.completedOn || body.completedon;
     }
     if (body.remarks !== undefined) updateFields.remarks = body.remarks;
+    if (body.description !== undefined) updateFields.description = body.description;
     if (body.owner !== undefined) updateFields.owner = body.owner;
 
     const { data, error } = await supabase

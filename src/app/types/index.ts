@@ -14,6 +14,7 @@ export interface Product {
   targetdate?: string;
   completedon?: string;
   remarks?: string;
+  description?: string;
   owner?: string;
   created_at: string;
   components?: Component[];
@@ -31,6 +32,7 @@ export interface Component {
   targetdate?: string;
   completedon?: string;
   remarks?: string;
+  description?: string;
   version?: string;
   created_at: string;
   features?: Feature[];
@@ -49,6 +51,7 @@ export interface Feature {
   targetdate?: string;
   completedon?: string;
   remarks?: string;
+  description?: string;
   version?: string;
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;

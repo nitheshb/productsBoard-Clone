@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
         targetdate: body.targetDate || null,
         completedon: body.completedOn || null,
         remarks: body.remarks || null,
+        description: body.description || null,
         version: body.version || '1.0.0'
       }])
       .select();

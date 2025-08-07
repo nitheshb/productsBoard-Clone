@@ -59,6 +59,7 @@ export function CreateFeatureModal({
     targetDate: null,
     completedOn: null,
     remarks: "",
+    description: "",
     version: "1.0.0",
   });
   const [activeTab, setActiveTab] = useState("details");
@@ -83,6 +84,7 @@ export function CreateFeatureModal({
             targetDate: data.targetDate || null,
             completedOn: data.completedOn || null,
             remarks: data.remarks || "",
+            description: data.description || "",
             version: data.version || "1.0.0",
           });
         })
@@ -98,6 +100,7 @@ export function CreateFeatureModal({
         targetDate: null,
         completedOn: null,
         remarks: "",
+        description: "",
         version: "1.0.0",
       });
     }
@@ -131,17 +134,6 @@ export function CreateFeatureModal({
         return 0;
     }
   };
-
-  // Update progress when status changes - REMOVE THIS FUNCTION
-  // const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  //   const newStatus = e.target.value;
-  //   const newProgress = calculateProgressFromStatus(newStatus);
-  //   setFormData(prev => ({
-  //     ...prev,
-  //     status: newStatus,
-  //     progress: newProgress
-  //   }));
-  // };
 
   // Replace with simple status change
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -205,6 +197,7 @@ export function CreateFeatureModal({
         targetDate: null,
         completedOn: null,
         remarks: "",
+        description: "",
         version: "1.0.0",
       });
     } catch (error) {
@@ -353,6 +346,19 @@ export function CreateFeatureModal({
           placeholder="e.g., 1.0.0"
         />
       </div>
+
+      {/* Description */}
+      <div className="flex items-center gap-1">
+        <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Description</span>
+        <Input
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          className="w-full h-[32px] bg-white border border-gray-300 focus:border-blue-500 focus:outline-none"
+          placeholder="Enter feature description"
+        />
+      </div>
     </div>
   );
 
@@ -450,16 +456,19 @@ export function CreateFeatureModal({
 
           {/* Action Buttons - only show on details tab */}
           {activeTab === "details" && (
-            <SheetFooter className="flex justify-end gap-2 py-4 mt-4 border-t">
+            <SheetFooter className="flex justify-end gap-2 py-4 mt-4">
               <SheetClose asChild>
-                <Button type="button" variant="outline" disabled={isCreating}>
+                
+              </SheetClose>
+              <div className="absolute bottom-0 right-0 p-2 flex justify-end gap-2 w-full border-t bg-white">
+              <Button type="button" variant="outline" disabled={isCreating} onClick={onClose}>
                   Cancel
                 </Button>
-              </SheetClose>
               <Button type="submit" disabled={isCreating} className="bg-blue-600 hover:bg-blue-700 text-white">
                 {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isCreating ? (featureId ? 'Updating...' : 'Creating...') : (featureId ? 'Update Feature' : 'Create Feature')}
               </Button>
+              </div>
             </SheetFooter>
           )}
         </form>

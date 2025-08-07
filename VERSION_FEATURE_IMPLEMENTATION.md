@@ -29,6 +29,16 @@ ADD COLUMN version VARCHAR(50) DEFAULT '1.0.0';
 ALTER TABLE features 
 ADD COLUMN version VARCHAR(50) DEFAULT '1.0.0';
 
+-- Add description columns to all tables
+ALTER TABLE products 
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE components 
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE features 
+ADD COLUMN IF NOT EXISTS description TEXT;
+
 -- Create a versions table to store available versions
 CREATE TABLE IF NOT EXISTS versions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -59,7 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_features_version ON features(version);
 
 ### 2. Updated Type Definitions
 
-The following interfaces have been updated to include version support:
+The following interfaces have been updated to include version and description support:
 
 ```typescript
 // src/app/types/index.ts
@@ -153,9 +163,61 @@ The following forms automatically include version fields through dynamic renderi
 - Component Details Form (`src/app/(main)/(pages)/productTable/_components/componentDetails.tsx`)
 - Feature Details Form (`src/app/(main)/(pages)/productTable/_components/featureDetails.tsx`)
 
+## Description Feature Implementation
+
+### 11. Database Schema Updates
+
+The following SQL commands add description columns to all tables:
+
+```sql
+-- Add description columns to all tables
+ALTER TABLE products 
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE components 
+ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE features 
+ADD COLUMN IF NOT EXISTS description TEXT;
+```
+
+### 12. TypeScript Interface Updates
+
+All interfaces now include description fields:
+
+```typescript
+export interface Product {
+  // ... existing fields
+  description?: string; // Added description
+}
+
+export interface Component {
+  // ... existing fields
+  description?: string; // Added description
+}
+
+export interface Feature {
+  // ... existing fields
+  description?: string; // Added description
+}
+```
+
+### 13. API Route Updates
+
+All API routes have been updated to handle description fields:
+- Product creation and updates
+- Component creation and updates  
+- Feature creation and updates
+
+### 14. UI Updates
+
+- Added description column to the product table
+- Added description fields to all create/update forms
+- Description fields are displayed in the table with truncation for long text
+
 ## Usage Instructions
 
-### 11. How to Use the Version Feature
+### 15. How to Use the Version Feature
 
 1. **Filter by Version:**
    - Use the Version dropdown in the filter bar

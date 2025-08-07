@@ -92,6 +92,7 @@ export async function PUT(
       targetdate: body.targetDate ?? body.targetdate ?? null,
       completedon: body.completedOn ?? body.completedon ?? null,
       remarks: body.remarks ?? null,
+      description: body.description ?? null,
       version: body.version ?? null,
       product_id: body.product_id ?? null
     };

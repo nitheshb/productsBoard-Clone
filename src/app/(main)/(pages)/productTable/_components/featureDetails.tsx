@@ -161,8 +161,10 @@ function DetailsTabContent({
           )}
         </div>
       </div>
+
+
       {/* Other fields */}
-      {(Object.keys(feature) as (keyof Feature)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'status' && key !== 'progress').map((key) => {
+      {(Object.keys(feature) as (keyof Feature)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'status' && key !== 'progress' && key !== 'description').map((key) => {
         const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         const isDateField = ['startdate', 'targetdate', 'completedon', 'start_date', 'target_date', 'completed_on'].includes(key.toLowerCase());
         return (
@@ -198,17 +200,6 @@ function DetailsTabContent({
             </div>
         );
       })}
-      {/* Save Button */}
-      <div className="flex justify-end mt-8">
-        <Button
-          onClick={onSave}
-          disabled={saving}
-          className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center"
-        >
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {saving ? 'Saving...' : 'Save'}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -373,8 +364,24 @@ export function FeatureDetailsPage({
   };
 
   const handleInputBlur = async (field: keyof Feature) => {
-    // Remove auto-save on blur
-    setEditingField(null);
+    // Auto-save for title and description fields
+    if (field === 'name' || field === 'description') {
+      await saveChanges(true);
+    }
+    // Only close the field if we're not switching to another field
+    // Use a small delay to check if focus moved to another editable field
+    setTimeout(() => {
+      const activeElement = document.activeElement;
+      const isSwitchingToEditableField = activeElement && 
+        (activeElement.tagName === 'INPUT' || 
+         activeElement.tagName === 'TEXTAREA' || 
+         activeElement.tagName === 'SELECT' ||
+         activeElement.getAttribute('contenteditable') === 'true');
+      
+      if (!isSwitchingToEditableField) {
+        setEditingField(null);
+      }
+    }, 50);
   };
 
   const handleInputKeyPress = async (
@@ -382,6 +389,10 @@ export function FeatureDetailsPage({
     field: keyof Feature
   ) => {
     if (event.key === "Enter") {
+      // Auto-save for title and description fields
+      if (field === 'name' || field === 'description') {
+        await saveChanges(true);
+      }
       setEditingField(null);
     } else if (event.key === "Escape") {
       setDraftFeature(feature ? { ...feature, id: feature.id || "" } : null); // Revert changes
@@ -389,7 +400,7 @@ export function FeatureDetailsPage({
     }
   };
 
-  const saveChanges = async () => {
+  const saveChanges = async (autoSave = false) => {
     if (!draftFeature || !featureId) return;
     setSaving(true);
     try {
@@ -411,17 +422,23 @@ export function FeatureDetailsPage({
       const data: Feature = await response.json();
       setFeature(data);
       setDraftFeature(data);
+      
       // Call the callback with updated feature
       if (onFeatureUpdated) {
         onFeatureUpdated(data);
       }
-      toast("Feature updated successfully!");
-      onClose();
-      // Optionally, trigger a UI refresh or parent update here
+      
+      // Only show toast and close form if not auto-saving
+      if (!autoSave) {
+        toast("Feature updated successfully!");
+        onClose();
+      }
     } catch (error) {
       console.error("Error updating feature:", error);
       setDraftFeature(feature);
-      toast.error("Error updating feature: " + (error instanceof Error ? error.message : "An unknown error occurred."));
+      if (!autoSave) {
+        toast.error("Error updating feature: " + (error instanceof Error ? error.message : "An unknown error occurred."));
+      }
     } finally {
       setSaving(false);
     }
@@ -447,8 +464,7 @@ export function FeatureDetailsPage({
           }
       toast("Feature deleted successfully!");
       if (typeof onFeatureDeleted === 'function') onFeatureDeleted();
-      if (typeof onFeatureUpdated === 'function') onFeatureUpdated({ id: featureId, deleted: true } as any); // Pass a dummy Feature object
-          onClose();
+      onClose();
         } catch (error) {
       toast.error("Error deleting feature: " + (error instanceof Error ? error.message : "An unknown error occurred."));
     } finally {
@@ -516,8 +532,6 @@ export function FeatureDetailsPage({
         if (onFeatureUpdated) {
           onFeatureUpdated(updatedFeature);
         }
-
-        console.log("Feature status updated successfully:", updatedFeature);
       } catch (error) {
         console.error("Error updating feature status:", error);
         // Reset draftFeature if there was an error
@@ -534,110 +548,139 @@ export function FeatureDetailsPage({
     return (
       <div className="">
         <Sheet open={isOpen} onOpenChange={onClose}>
-          <SheetContent className="sm:max-w-2xl w-full max-w-2xl overflow-y-auto p-8 rounded-lg shadow-lg bg-white">
-            <SheetHeader className="flex flex-col items-start gap-2">
-              <div className="flex items-center justify-between w-full mb-2">
-                <div className="relative w-full flex items-center">
-                  <div className="flex-1 flex items-center">
-                    {editingField === 'name' ? (
-                      <Input
-                        ref={editInputRef}
-                        type="text"
-                        value={draftFeature?.name || ''}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        onBlur={() => handleInputBlur('name')}
-                        onKeyDown={(e) => handleInputKeyPress(e, 'name')}
-                        className="w-full text-2xl font-bold border-2 border-blue-200 focus:border-blue-500 bg-blue-50 px-4 py-2 rounded"
-                      />
-                    ) : (
-                      <SheetTitle className="text-2xl font-bold text-blue-900 w-full">{feature?.name}</SheetTitle>
-                    )}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => setEditingField('name')}
-                            className="ml-2 p-2 rounded-full bg-gray-100 hover:bg-blue-100 text-blue-600 hover:text-blue-800 transition"
-                            aria-label="Edit feature name"
-                            type="button"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" align="center">
-                          Edit feature name
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={handleDelete}
-                            className="ml-2 p-2 rounded-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 transition"
-                            aria-label="Delete feature"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" align="center">
-                          Delete feature
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+          <SheetContent className="sm:max-w-2xl w-full max-w-2xl p-0 rounded-lg shadow-lg flex flex-col h-full bg-white">
+            {/* Fixed Header */}
+            <div className="flex-shrink-0 p-8 pb-4">
+              <SheetHeader className="flex flex-col items-start gap-2">
+                <div className="flex items-center justify-between w-full mb-2">
+                  <div className="relative w-full flex items-center">
+                    <div className="flex-1 flex items-center">
+                      {editingField === 'name' ? (
+                        <Input
+                          ref={editInputRef}
+                          type="text"
+                          value={draftFeature?.name || ''}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                          onBlur={() => handleInputBlur('name')}
+                          onKeyDown={(e) => handleInputKeyPress(e, 'name')}
+                          className="w-full text-2xl font-bold border-2 border-blue-200 focus:border-blue-500 bg-blue-50 px-4 py-2 rounded"
+                        />
+                      ) : (
+                        <SheetTitle 
+                          className="text-2xl font-bold text-blue-900 w-full cursor-pointer hover:text-blue-700 transition-colors"
+                          onClick={() => setEditingField('name')}
+                        >
+                          {feature?.name}
+                        </SheetTitle>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Tab Navigation */}
+                {/* Description subtitle */}
+                <div className="w-full mt-1">
+                  {editingField === 'description' ? (
+                    <Input
+                      ref={editInputRef}
+                      type="text"
+                      value={draftFeature?.description || ''}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      onBlur={() => handleInputBlur('description')}
+                      onKeyDown={(e) => handleInputKeyPress(e, 'description')}
+                      className="w-full text-sm font-semibold text-gray-600 border-2 border-gray-200 focus:border-gray-400 bg-gray-50 px-4 py-2 rounded"
+                      placeholder="Enter description"
+                    />
+                  ) : (
+                    <p 
+                      className="text-sm font-semibold text-gray-600 w-full cursor-pointer hover:text-gray-800 transition-colors"
+                      onClick={() => setEditingField('description')}
+                    >
+                      {feature?.description || 'Click to add description'}
+                    </p>
+                  )}
+                </div>
 
-              <div className="mt-[16px] border-b w-full">
-                <FeatureDetailsTab
-                  label="Details"
-                  isActive={activeTab === "details"}
-                  onClick={() => handleTabChange("details")}
+                {/* Tab Navigation */}
+                <div className="mt-[16px] border-b w-full">
+                  <FeatureDetailsTab
+                    label="Details"
+                    isActive={activeTab === "details"}
+                    onClick={() => handleTabChange("details")}
+                  />
+                  <FeatureDetailsTab
+                    label="Insights"
+                    isActive={activeTab === "insights"}
+                    onClick={() => handleTabChange("insights")}
+                  />
+                  <FeatureDetailsTab
+                    label="Portal"
+                    isActive={activeTab === "portal"}
+                    onClick={() => handleTabChange("portal")}
+                  />
+                </div>
+              </SheetHeader>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-8 pb-0">
+              {activeTab === "details" && (
+                <DetailsTabContent
+                  feature={feature}
+                  draftFeature={draftFeature}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  editInputRef={editInputRef}
+                  handleFieldHover={handleFieldHover}
+                  handleInputChange={handleInputChange}
+                  handleDateChange={handleDateChange}
+                  handleInputBlur={handleInputBlur}
+                  handleInputKeyPress={handleInputKeyPress}
+                  onSave={() => saveChanges(false)}
+                  saving={saving}
                 />
-                <FeatureDetailsTab
-                  label="Insights"
-                  isActive={activeTab === "insights"}
-                  onClick={() => handleTabChange("insights")}
-                />
+              )}
+              {activeTab === "insights" && <InsightsTabContent />}
+              {activeTab === "health" && <PortalHealthContent />}
+              {activeTab === "portal" && <PortalTabContent />}
 
-                <FeatureDetailsTab
-                  label="Portal"
-                  isActive={activeTab === "portal"}
-                  onClick={() => handleTabChange("portal")}
-                />
+              {updatingProgress && (
+                <div className="mt-4 p-2 bg-blue-50 text-blue-700 rounded text-sm">
+                  Updating progress and recalculating component and product
+                  metrics...
+                </div>
+              )}
+            </div>
+
+            {/* Fixed Footer with Save Button */}
+            <div className="flex-shrink-0 p-4">
+              <div className="flex justify-between items-center">
+                <Button
+                  onClick={handleDelete}
+                  variant="destructive"
+                  className="px-6 py-2 rounded bg-red-600 text-white font-semibold hover:bg-red-700 transition flex items-center justify-center"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={onClose}
+                    variant="outline"
+                    className="px-6 py-2 rounded border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => saveChanges(false)}
+                    disabled={saving}
+                    className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {saving ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
               </div>
-            </SheetHeader>
-
-            {/* Tab Content */}
-            {activeTab === "details" && (
-              <DetailsTabContent
-                feature={feature}
-                draftFeature={draftFeature}
-                editingField={editingField}
-                setEditingField={setEditingField}
-                editInputRef={editInputRef}
-                handleFieldHover={handleFieldHover}
-                handleInputChange={handleInputChange}
-                handleDateChange={handleDateChange}
-                handleInputBlur={handleInputBlur}
-                handleInputKeyPress={handleInputKeyPress}
-                onSave={saveChanges}
-                saving={saving}
-              />
-            )}
-            {activeTab === "insights" && <InsightsTabContent />}
-            {activeTab === "health" && <PortalHealthContent />}
-            {activeTab === "portal" && <PortalTabContent />}
-
-            {updatingProgress && (
-              <div className="mt-4 p-2 bg-blue-50 text-blue-700 rounded text-sm">
-                Updating progress and recalculating component and product
-                metrics...
-              </div>
-            )}
+            </div>
           </SheetContent>
         </Sheet>
         <ConfirmationDialog

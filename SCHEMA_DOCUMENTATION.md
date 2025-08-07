@@ -17,6 +17,7 @@ CREATE TABLE products (
     targetDate DATE,
     completedOn DATE,
     remarks TEXT,
+    description TEXT,
     version VARCHAR(50) DEFAULT '1.0.0',
     owner_initials TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -35,6 +36,7 @@ CREATE TABLE products (
 - `targetDate` - Target completion date (optional)
 - `completedOn` - Actual completion date (optional)
 - `remarks` - Additional notes (optional)
+- `description` - Product description (optional)
 - `version` - Version identifier (default: '1.0.0')
 - `owner_initials` - Owner initials (optional)
 - `created_at` - Creation timestamp
@@ -54,6 +56,7 @@ CREATE TABLE components (
     targetDate DATE,
     completedOn DATE,
     remarks TEXT,
+    description TEXT,
     version VARCHAR(50) DEFAULT '1.0.0',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -72,6 +75,7 @@ CREATE TABLE components (
 - `targetDate` - Target completion date (optional)
 - `completedOn` - Actual completion date (optional)
 - `remarks` - Additional notes (optional)
+- `description` - Component description (optional)
 - `version` - Version identifier (default: '1.0.0')
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
@@ -90,6 +94,7 @@ CREATE TABLE features (
     targetDate DATE,
     completedOn DATE,
     remarks TEXT,
+    description TEXT,
     version VARCHAR(50) DEFAULT '1.0.0',
     color TEXT,
     owner_initials TEXT,
@@ -110,6 +115,7 @@ CREATE TABLE features (
 - `targetDate` - Target completion date (optional)
 - `completedOn` - Actual completion date (optional)
 - `remarks` - Additional notes (optional)
+- `description` - Feature description (optional)
 - `version` - Version identifier (default: '1.0.0')
 - `color` - UI color identifier (optional)
 - `owner_initials` - Owner initials (optional)
@@ -188,6 +194,7 @@ export interface Product {
   targetDate?: string;
   completedOn?: string;
   remarks?: string;
+  description?: string;
   version?: string;
   created_at: string;
   components?: Component[];
@@ -209,6 +216,7 @@ export interface Component {
   targetDate?: string;
   completedOn?: string;
   remarks?: string;
+  description?: string;
   version?: string;
   created_at: string;
   features?: Feature[];
@@ -229,6 +237,7 @@ export interface Feature {
   targetDate?: string;
   completedOn?: string;
   remarks?: string;
+  description?: string;
   version?: string;
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
