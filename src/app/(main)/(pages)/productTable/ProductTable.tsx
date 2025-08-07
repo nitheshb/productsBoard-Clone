@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   ChevronDown,
@@ -34,6 +33,8 @@ import { CreateFeatureModal } from "./_components/createFeatureModal";
 import { CreateComponentModal } from "./_components/createComponentModal";
 import CreateProductModal from "./_components/createModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getVersionProgressDisplay } from "@/utils/versionProgressCalculator";
+import { toast } from "sonner";
 
 // Helper: recursively check if any feature exists in the tree
 function hasAnyFeature(item: TableItem | undefined): boolean {
@@ -901,61 +902,98 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   }
 
   async function createNewComponent(newComponent: any, productId: string) {
-    try {
-      const newComponentItem: TableItem = {
-        type: "component",
-        id: newComponent.id,
-        name: newComponent.name,
-        level: 1,
-        data: newComponent,
-      };
-      setTableData((prevData) =>
-        prevData.map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                children: [...(item.children || []), newComponentItem],
-              }
-            : item
-        )
-      );
+    const newComponentItem: TableItem = {
+      type: "component",
+      id: newComponent.id,
+      name: newComponent.name,
+      level: 1,
+      data: newComponent,
+    };
 
-      setAllTableData((prevData) =>
-        prevData.map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                children: [...(item.children || []), newComponentItem],
-              }
-            : item
-        )
-      );
+    setTableData((prevData) =>
+      prevData.map((item) =>
+        item.type === "product" && item.id === productId
+          ? {
+              ...item,
+              children: [...(item.children || []), newComponentItem],
+            }
+          : item
+      )
+    );
 
-      setExpandedItems((prev) => ({
-        ...prev,
-        [`product-${productId}`]: true,
-      }));
+    setAllTableData((prevData) =>
+      prevData.map((item) =>
+        item.type === "product" && item.id === productId
+          ? {
+              ...item,
+              children: [...(item.children || []), newComponentItem],
+            }
+          : item
+      )
+    );
 
-      setCreatingComponentForProduct(null);
-      setNewComponentName("");
-    } catch (error) {
-      console.error("Error handling component creation:", error);
-    }
+    setExpandedItems((prev) => {
+      const updatedExpanded = { ...prev };
+      updatedExpanded[`product-${productId}`] = true;
+      return updatedExpanded;
+    });
+
+    // Refresh the product's progress after creating a new component
+    const refreshProductProgress = async () => {
+      try {
+        console.log(`Refreshing product progress for product ${productId} after component creation`);
+        const response = await fetch(`/api/product/${productId}`);
+        if (response.ok) {
+          const updatedProduct = await response.json();
+          console.log('Updated product data after component creation:', updatedProduct);
+          
+          // Update the product in the table data
+          setTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.id === productId
+                ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                : item
+            )
+          );
+          setAllTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.id === productId
+                ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                : item
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error refreshing product progress after component creation:', error);
+      }
+    };
+    
+    // Call the refresh function
+    refreshProductProgress();
+
+    setIsCreateComponentModalOpen(false);
+    setSelectedProductIdForComponent(null);
   }
 
   async function createNewInlineComponent(name: string, productId: string) {
     try {
-      const { data, error } = await supabase
-        .from("components")
-        .insert([{ name, product_id: productId }])
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const newComponent = data[0];
-        createNewComponent(newComponent, productId);
+      const response = await fetch('/api/component', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          product_id: productId,
+          updateProductProgress: true,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create component');
       }
+      
+      const newComponent = await response.json();
+      createNewComponent(newComponent, productId);
     } catch (error) {
       console.error("Error creating component:", error);
     }
@@ -1017,6 +1055,53 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
       }
       return updatedExpanded;
     });
+
+    // Refresh the component's progress after creating a new feature
+    const refreshComponentProgress = async () => {
+      try {
+        console.log(`Refreshing component progress for component ${componentId} after feature creation`);
+        const response = await fetch(`/api/component/${componentId}`);
+        if (response.ok) {
+          const updatedComponent = await response.json();
+          console.log('Updated component data after feature creation:', updatedComponent);
+          
+          // Update the component in the table data
+          setTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === componentId
+                        ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                        : child
+                    ),
+                  }
+                : item
+            )
+          );
+          setAllTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === componentId
+                        ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                        : child
+                    ),
+                  }
+                : item
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error refreshing component progress after feature creation:', error);
+      }
+    };
+    
+    // Call the refresh function
+    refreshComponentProgress();
 
     setIsCreateFeatureModalOpen(false);
     setSelectedComponentIdForFeature(null);
@@ -1345,25 +1430,25 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </span>
           </TableCell>
           <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-12 bg-gray-200 rounded-full h-1.5">
+            <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+              <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
                 <div 
-                  className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${child.data.progress || 0}%` }}
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${getProgressValue(child)}%` }}
                 ></div>
               </div>
               <span className="text-xs font-medium">
-                {child.data.progress !== undefined ? `${child.data.progress}%` : "0%"}
+                {getProgressValue(child)}%
               </span>
             </div>
           </TableCell>
-          <TableCell className="w-[144px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+          <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
             {child.data.team || "-"}
           </TableCell>
-          <TableCell className="w-[112px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+          <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
             {child.data.days !== undefined ? child.data.days : "-"}
           </TableCell>
-          <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+          <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
             {(() => {
               const startDate = child.data.startdate;
               if (!startDate) return "-";
@@ -1371,7 +1456,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               return (startDate as Date).toISOString().split('T')[0];
             })()}
           </TableCell>
-          <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+          <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
             {(() => {
               const endDate = child.data.targetdate;
               if (!endDate) return "-";
@@ -1432,10 +1517,44 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           : item
       )
     );
+    
+    // Refresh the product's progress by fetching updated product data
+    const refreshProductProgress = async () => {
+      try {
+        console.log(`Refreshing product progress for product ${updatedComponent.product_id}`);
+        const response = await fetch(`/api/product/${updatedComponent.product_id}`);
+        if (response.ok) {
+          const updatedProduct = await response.json();
+          console.log('Updated product data:', updatedProduct);
+          
+          // Update the product in the table data
+          setTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.id === updatedComponent.product_id
+                ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                : item
+            )
+          );
+          setAllTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.id === updatedComponent.product_id
+                ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                : item
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error refreshing product progress:', error);
+      }
+    };
+    
+    // Call the refresh function
+    refreshProductProgress();
   };
 
   const handleFeatureUpdated = (updatedFeature: Feature) => {
     console.log('Updating feature in table:', updatedFeature);
+    
     // Update feature in both tableData and allTableData
     setTableData((prevData) =>
       prevData.map((item) =>
@@ -1479,6 +1598,53 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           : item
       )
     );
+    
+    // Refresh the component's progress by fetching updated component data
+    const refreshComponentProgress = async () => {
+      try {
+        console.log(`Refreshing component progress for component ${updatedFeature.component_id}`);
+        const response = await fetch(`/api/component/${updatedFeature.component_id}`);
+        if (response.ok) {
+          const updatedComponent = await response.json();
+          console.log('Updated component data:', updatedComponent);
+          
+          // Update the component in the table data
+          setTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === updatedFeature.component_id
+                        ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                        : child
+                    ),
+                  }
+                : item
+            )
+          );
+          setAllTableData((prevData) =>
+            prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === updatedFeature.component_id
+                        ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                        : child
+                    ),
+                  }
+                : item
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error refreshing component progress:', error);
+      }
+    };
+    
+    // Call the refresh function
+    refreshComponentProgress();
   };
 
   const handleProductDeleted = (deletedProductId: string) => {
@@ -1494,6 +1660,22 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
 
   const handleComponentDeleted = (deletedComponentId: string) => {
     console.log('Deleting component from table:', deletedComponentId);
+    
+    // Find the product ID for the deleted component
+    let productId: string | null = null;
+    setTableData((prevData) => {
+      for (const product of prevData) {
+        if (product.children) {
+          const component = product.children.find(c => c.id === deletedComponentId);
+          if (component) {
+            productId = product.id;
+            break;
+          }
+        }
+      }
+      return prevData;
+    });
+    
     // Remove component from both tableData and allTableData
     setTableData((prevData) =>
       prevData.map((item) =>
@@ -1515,10 +1697,65 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           : item
       )
     );
+    
+    // Refresh the product's progress if we found the product ID
+    if (productId) {
+      const refreshProductProgress = async () => {
+        try {
+          console.log(`Refreshing product progress for product ${productId} after component deletion`);
+          const response = await fetch(`/api/product/${productId}`);
+          if (response.ok) {
+            const updatedProduct = await response.json();
+            console.log('Updated product data after component deletion:', updatedProduct);
+            
+            // Update the product in the table data
+            setTableData((prevData) =>
+              prevData.map((item) =>
+                item.type === "product" && item.id === productId
+                  ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                  : item
+              )
+            );
+            setAllTableData((prevData) =>
+              prevData.map((item) =>
+                item.type === "product" && item.id === productId
+                  ? { ...item, data: updatedProduct, name: updatedProduct.name }
+                  : item
+              )
+            );
+          }
+        } catch (error) {
+          console.error('Error refreshing product progress after component deletion:', error);
+        }
+      };
+      
+      // Call the refresh function
+      refreshProductProgress();
+    }
   };
 
   const handleFeatureDeleted = (deletedFeatureId: string) => {
     console.log('Deleting feature from table:', deletedFeatureId);
+    
+    // Find the component ID for the deleted feature
+    let componentId: string | null = null;
+    setTableData((prevData) => {
+      for (const product of prevData) {
+        if (product.children) {
+          for (const component of product.children) {
+            if (component.children) {
+              const feature = component.children.find(f => f.id === deletedFeatureId);
+              if (feature) {
+                componentId = component.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+      return prevData;
+    });
+    
     // Remove feature from both tableData and allTableData
     setTableData((prevData) =>
       prevData.map((item) =>
@@ -1554,6 +1791,69 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           : item
       )
     );
+    
+    // Refresh the component's progress if we found the component ID
+    if (componentId) {
+      const refreshComponentProgress = async () => {
+        try {
+          console.log(`Refreshing component progress for component ${componentId} after feature deletion`);
+          const response = await fetch(`/api/component/${componentId}`);
+          if (response.ok) {
+            const updatedComponent = await response.json();
+            console.log('Updated component data after feature deletion:', updatedComponent);
+            
+            // Update the component in the table data
+            setTableData((prevData) =>
+              prevData.map((item) =>
+                item.type === "product" && item.children
+                  ? {
+                      ...item,
+                      children: item.children.map((child) =>
+                        child.id === componentId
+                          ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                          : child
+                      ),
+                    }
+                  : item
+              )
+            );
+            setAllTableData((prevData) =>
+              prevData.map((item) =>
+                item.type === "product" && item.children
+                  ? {
+                      ...item,
+                      children: item.children.map((child) =>
+                        child.id === componentId
+                          ? { ...child, data: updatedComponent, name: updatedComponent.name }
+                          : child
+                      ),
+                    }
+                  : item
+              )
+            );
+          }
+        } catch (error) {
+          console.error('Error refreshing component progress after feature deletion:', error);
+        }
+      };
+      
+      // Call the refresh function
+      refreshComponentProgress();
+    }
+  };
+
+  // Helper function to get progress value based on version filter
+  const getProgressValue = (item: TableItem): number => {
+    // If version filter is applied, show version-specific progress
+    if (versionFilter && versionFilter.length > 0) {
+      const selectedVersion = versionFilter[0]; // Take the first version if multiple
+      if (item.data.version_progress && item.data.version_progress.length > 0) {
+        const versionData = item.data.version_progress.find((vp: any) => vp.version === selectedVersion);
+        return versionData ? versionData.progress : 0;
+      }
+    }
+    // Otherwise, show normal progress (average of all children)
+    return item.data.progress || 0;
   };
 
   return (
@@ -1895,16 +2195,16 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                         {item.data.status || "-"}
                       </span>
                     </TableCell>
-                    <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      <div className="flex items-center gap-2" title="Product Progress">
+                    <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+                      <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
                         <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
                           <div 
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${item.data.progress || 0}%` }}
+                            style={{ width: `${getProgressValue(item)}%` }}
                           ></div>
                         </div>
                         <span className="text-xs font-medium">
-                          {item.data.progress !== undefined ? `${item.data.progress}%` : "0%"}
+                          {getProgressValue(item)}%
                         </span>
                       </div>
                     </TableCell>

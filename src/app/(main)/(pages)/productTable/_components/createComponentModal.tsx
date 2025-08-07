@@ -140,7 +140,10 @@ export function CreateComponentModal({
         const response = await fetch('/api/component', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            ...formData,
+            updateProductProgress: true,
+          }),
         });
         if (!response.ok) {
           const errorData = await response.json();

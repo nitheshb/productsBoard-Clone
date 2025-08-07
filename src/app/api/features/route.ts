@@ -3,6 +3,7 @@
 // api/features/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { updateComponentProgressWithParents } from '@/utils/progressCalculator';
 
 // Helper function to calculate progress from status
 const calculateProgressFromStatus = (status: string): number => {
@@ -16,80 +17,6 @@ const calculateProgressFromStatus = (status: string): number => {
       return 0;
   }
 };
-
-// Function to update component progress based on its features
-async function updateComponentProgress(componentId: string) {
-  try {
-    // Get all features for this component
-    const { data: features, error: featuresError } = await supabase
-      .from('features')
-      .select('progress')
-      .eq('component_id', componentId);
-    
-    if (featuresError) {
-      console.error('Error fetching features:', featuresError);
-      throw featuresError;
-    }
-    
-    // Calculate average progress from actual progress values
-    const totalProgress = features.reduce((sum, feature) => sum + (feature.progress || 0), 0);
-    const averageProgress = features.length > 0 ? Math.round(totalProgress / features.length) : 0;
-    
-    
-    // Update the component's progress
-    const { error: updateError } = await supabase
-      .from('components')
-      .update({ progress: averageProgress })
-      .eq('id', componentId);
-    
-    if (updateError) {
-      console.error('Error updating component:', updateError);
-      throw updateError;
-    }
-    
-    return averageProgress;
-  } catch (error) {
-    console.error('Error updating component progress:', error);
-    throw error;
-  }
-}
-
-// Function to update product progress based on its components
-async function updateProductProgress(productId: string) {
-  try {
-    // Get all components for this product
-    const { data: components, error: componentsError } = await supabase
-      .from('components')
-      .select('progress')
-      .eq('product_id', productId);
-    
-    if (componentsError) {
-      console.error('Error fetching components:', componentsError);
-      throw componentsError;
-    }
-    
-    // Calculate average progress
-    const totalProgress = components.reduce((sum, component) => sum + (component.progress || 0), 0);
-    const averageProgress = components.length > 0 ? Math.round(totalProgress / components.length) : 0;
-    
-    
-    // Update the product's progress
-    const { error: updateError } = await supabase
-      .from('products')
-      .update({ progress: averageProgress })
-      .eq('id', productId);
-    
-    if (updateError) {
-      console.error('Error updating product:', updateError);
-      throw updateError;
-    }
-    
-    return averageProgress;
-  } catch (error) {
-    console.error('Error updating product progress:', error);
-    throw error;
-  }
-}
 
 // Create a new feature
 export async function POST(request: NextRequest) {
@@ -138,6 +65,15 @@ export async function POST(request: NextRequest) {
       throw new Error(`Supabase error: ${error.message}`);
     }
 
+    // Update component progress and version progress if flag is true
+    if (shouldUpdateComponentProgress) {
+      try {
+        await updateComponentProgressWithParents(featureData.component_id);
+      } catch (progressError) {
+        console.error('Error updating component progress:', progressError);
+        // Don't fail the feature creation if progress update fails
+      }
+    }
 
     return NextResponse.json(data[0]);
   } catch (error: any) {

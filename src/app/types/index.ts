@@ -2,12 +2,18 @@
 
 // app/types/index.ts
 
+export interface VersionProgress {
+  version: string;
+  progress: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   status?: string;
   progress?: number;
   version?: string;
+  version_progress?: VersionProgress[];
   team?: string;
   days?: number;
   startdate?: string;
@@ -34,6 +40,7 @@ export interface Component {
   remarks?: string;
   description?: string;
   version?: string;
+  version_progress?: VersionProgress[];
   created_at: string;
   features?: Feature[];
 }
@@ -53,6 +60,7 @@ export interface Feature {
   remarks?: string;
   description?: string;
   version?: string;
+  version_progress?: VersionProgress[];
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
   owner?: string;

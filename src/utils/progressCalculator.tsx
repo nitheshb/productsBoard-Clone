@@ -1,5 +1,11 @@
 
 import { supabase } from "@/lib/supabaseClient";
+import { 
+  updateComponentVersionProgress, 
+  updateProductVersionProgress,
+  updateParentComponentVersionProgress,
+  updateParentProductVersionProgress
+} from "./versionProgressCalculator";
 
 export const calculateFeatureProgress = (status: string): number => {
   switch (status) {
@@ -48,6 +54,9 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
       .from('components')
       .update({ progress: average })
       .eq('id', componentId);
+    
+    // Update version progress for this component
+    await updateComponentVersionProgress(componentId);
       
     return average;
   } catch (error) {
@@ -106,17 +115,43 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
       averageProgress = Math.round(totalProgress / componentsWithProgress.length);
     }
 
-
     const { error: updateError } = await supabase
       .from('products')
       .update({ progress: averageProgress })
       .eq('id', productId);
       
     if (updateError) throw updateError;
+    
+    // Update version progress for this product
+    await updateProductVersionProgress(productId);
       
     return averageProgress;
   } catch (error) {
     console.error('Error updating product progress:', error);
+    throw error;
+  }
+};
+
+// Update component progress and trigger parent updates
+export const updateComponentProgressWithParents = async (componentId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
+  try {
+    const progress = await updateComponentProgressInDb(componentId, teamFilter, versionFilter);
+    await updateParentComponentVersionProgress(componentId);
+    return progress;
+  } catch (error) {
+    console.error('Error updating component progress with parents:', error);
+    throw error;
+  }
+};
+
+// Update product progress and trigger parent updates
+export const updateProductProgressWithParents = async (productId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
+  try {
+    const progress = await updateProductProgressInDb(productId, teamFilter, versionFilter);
+    await updateParentProductVersionProgress(productId);
+    return progress;
+  } catch (error) {
+    console.error('Error updating product progress with parents:', error);
     throw error;
   }
 };

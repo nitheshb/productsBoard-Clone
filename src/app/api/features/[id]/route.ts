@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { updateComponentProgressWithParents } from '@/utils/progressCalculator';
 
 // Helper function to calculate progress from status
 const calculateProgressFromStatus = (status: string): number => {
@@ -53,10 +54,10 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    // Check if feature exists
+    // Check if feature exists and get its component_id
     const { data: existingFeature, error: checkError } = await supabase
       .from('features')
-      .select('id')
+      .select('id, component_id')
       .eq('id', id)
       .single();
 
@@ -93,6 +94,16 @@ export async function PUT(
 
     if (error) throw error;
 
+    // Update component progress and version progress
+    if (existingFeature?.component_id) {
+      try {
+        await updateComponentProgressWithParents(existingFeature.component_id);
+      } catch (progressError) {
+        console.error('Error updating component progress:', progressError);
+        // Don't fail the feature update if progress update fails
+      }
+    }
+
     return NextResponse.json(data[0]);
   } catch (error) {
     console.error('Error updating feature:', error);
@@ -109,6 +120,17 @@ export async function DELETE(
   try {
     const { id } = params;
 
+    // Get the component_id before deleting
+    const { data: feature, error: fetchError } = await supabase
+      .from('features')
+      .select('component_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw fetchError;
+    }
+
     // Delete the feature
     const { error } = await supabase
       .from('features')
@@ -116,6 +138,16 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) throw error;
+
+    // Update component progress and version progress after deletion
+    if (feature?.component_id) {
+      try {
+        await updateComponentProgressWithParents(feature.component_id);
+      } catch (progressError) {
+        console.error('Error updating component progress after deletion:', progressError);
+        // Don't fail the deletion if progress update fails
+      }
+    }
 
     return NextResponse.json({ message: 'Feature deleted successfully' });
   } catch (error) {

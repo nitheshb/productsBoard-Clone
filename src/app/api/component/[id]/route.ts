@@ -3,6 +3,7 @@
 // components/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { updateProductProgressWithParents } from '@/utils/progressCalculator';
 
 // Get a single component with its features
 export async function GET(
@@ -67,10 +68,10 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    // Check if component exists
+    // Check if component exists and get its product_id
     const { data: existingComponent, error: checkError } = await supabase
       .from('components')
-      .select('id')
+      .select('id, product_id')
       .eq('id', id)
       .single();
 
@@ -81,31 +82,38 @@ export async function PUT(
       throw checkError;
     }
 
+    // Extract the flag, defaulting to true if not specified
+    const shouldUpdateProductProgress = body.updateProductProgress !== false;
+    
+    // Remove the flag from the body before updating
+    const updateData = { ...body };
+    delete updateData.updateProductProgress;
+
     // Always update all fields, setting to null if not present in the body
     const updateFields: any = {
-      name: body.name ?? null,
-      status: body.status ?? null,
-      progress: body.progress ?? null,
-      team: body.team ?? null,
-      days: body.days ?? null,
-      startdate: body.startDate ?? body.startdate ?? null,
-      targetdate: body.targetDate ?? body.targetdate ?? null,
-      completedon: body.completedOn ?? body.completedon ?? null,
-      remarks: body.remarks ?? null,
-      description: body.description ?? null,
-      version: body.version ?? null,
-      product_id: body.product_id ?? null
+      name: updateData.name ?? null,
+      status: updateData.status ?? null,
+      progress: updateData.progress ?? null,
+      team: updateData.team ?? null,
+      days: updateData.days ?? null,
+      startdate: updateData.startDate ?? updateData.startdate ?? null,
+      targetdate: updateData.targetDate ?? updateData.targetdate ?? null,
+      completedon: updateData.completedOn ?? updateData.completedon ?? null,
+      remarks: updateData.remarks ?? null,
+      description: updateData.description ?? null,
+      version: updateData.version ?? null,
+      product_id: updateData.product_id ?? null
     };
 
     // Handle date fields with snake_case
-    if (body.startDate !== undefined) {
-      updateFields.startdate = body.startDate;
+    if (updateData.startDate !== undefined) {
+      updateFields.startdate = updateData.startDate;
     }
-    if (body.targetDate !== undefined) {
-      updateFields.targetdate = body.targetDate;
+    if (updateData.targetDate !== undefined) {
+      updateFields.targetdate = updateData.targetDate;
     }
-    if (body.completedOn !== undefined) {
-      updateFields.completedon = body.completedOn;
+    if (updateData.completedOn !== undefined) {
+      updateFields.completedon = updateData.completedOn;
     }
 
     // Remove any camelCase date fields
@@ -120,6 +128,16 @@ export async function PUT(
       .select();
 
     if (error) throw error;
+
+    // Update product progress and version progress if flag is true
+    if (shouldUpdateProductProgress && existingComponent?.product_id) {
+      try {
+        await updateProductProgressWithParents(existingComponent.product_id);
+      } catch (progressError) {
+        console.error('Error updating product progress:', progressError);
+        // Don't fail the component update if progress update fails
+      }
+    }
 
     return NextResponse.json(data[0]);
   } catch (error) {
@@ -136,6 +154,17 @@ export async function DELETE(
   try {
     const { id } = params;
 
+    // Get the product_id before deleting
+    const { data: component, error: fetchError } = await supabase
+      .from('components')
+      .select('product_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw fetchError;
+    }
+
     // Delete the component (cascade deletion will handle features)
     const { error } = await supabase
       .from('components')
@@ -143,6 +172,16 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) throw error;
+
+    // Update product progress and version progress after deletion
+    if (component?.product_id) {
+      try {
+        await updateProductProgressWithParents(component.product_id);
+      } catch (progressError) {
+        console.error('Error updating product progress after deletion:', progressError);
+        // Don't fail the deletion if progress update fails
+      }
+    }
 
     return NextResponse.json({ message: 'Component deleted successfully' });
   } catch (error) {

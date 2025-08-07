@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { updateProductProgressWithParents } from '@/utils/progressCalculator';
 
 // Get all components
 export async function GET(request: NextRequest) {
@@ -31,46 +32,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// // Create a new component
-// export async function POST(request: NextRequest) {
-//   try {
-//     const body = await request.json();
-
-//     // Validate required fields
-//     if (!body.name || !body.product_id) {
-//       return NextResponse.json({ error: 'Component name and product_id are required' }, { status: 400 });
-//     }
-
-//     // Create the component
-//     const { data, error } = await supabase
-//       .from('components')
-//       .insert([{
-//         name: body.name,
-//         product_id: body.product_id,
-//         status: body.status || null,
-//         progress: body.progress !== undefined ? body.progress : null,
-//         team: body.team || null,
-//         days: body.days !== undefined ? body.days : null,
-//         startdate: body.startDate || null,
-//         targetdate: body.targetDate || null,
-//         completedon: body.completedOn || null,
-//         remarks: body.remarks || null,
-//         version: body.version || '1.0.0'
-//       }])
-//       .select();
-
-//     if (error) throw error;
-
-//     return NextResponse.json(data[0], { status: 201 });
-//   } catch (error) {
-//     console.error('Error creating component:', error);
-//     return NextResponse.json({ error: 'Failed to create component' }, { status: 500 });
-//   }
-// }
-
-
-
-
 // Create a new component
 export async function POST(request: NextRequest) {
   try {
@@ -81,26 +42,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Component name and product_id are required' }, { status: 400 });
     }
 
+    // Extract the flag, defaulting to true if not specified
+    const shouldUpdateProductProgress = body.updateProductProgress !== false;
+    
+    // Remove the flag from the body before inserting into database
+    const componentData = { ...body };
+    delete componentData.updateProductProgress;
+
     // Create the component
     const { data, error } = await supabase
       .from('components')
       .insert([{
-        name: body.name,
-        product_id: body.product_id,
-        status: body.status || null,
-        progress: body.progress !== undefined ? body.progress : null,
-        team: body.team || null,
-        days: body.days !== undefined ? body.days : null,
-        startdate: body.startDate || null,
-        targetdate: body.targetDate || null,
-        completedon: body.completedOn || null,
-        remarks: body.remarks || null,
-        description: body.description || null,
-        version: body.version || '1.0.0'
+        name: componentData.name,
+        product_id: componentData.product_id,
+        status: componentData.status || null,
+        progress: componentData.progress !== undefined ? componentData.progress : null,
+        team: componentData.team || null,
+        days: componentData.days !== undefined ? componentData.days : null,
+        startdate: componentData.startDate || null,
+        targetdate: componentData.targetDate || null,
+        completedon: componentData.completedOn || null,
+        remarks: componentData.remarks || null,
+        description: componentData.description || null,
+        version: componentData.version || '1.0.0'
       }])
       .select();
 
     if (error) throw error;
+
+    // Update product progress and version progress if flag is true
+    if (shouldUpdateProductProgress) {
+      try {
+        await updateProductProgressWithParents(componentData.product_id);
+      } catch (progressError) {
+        console.error('Error updating product progress:', progressError);
+        // Don't fail the component creation if progress update fails
+      }
+    }
 
     // Remap the returned data to camelCase for consistency with GET API
     const created = data[0];
@@ -111,10 +89,6 @@ export async function POST(request: NextRequest) {
       completedOn: created.completedon || null,
       // Add remapping for any other fields if necessary
     };
-
-    // TODO: Optionally update product progress here, similar to the PUT handler
-    // For example:
-    // await updateProductProgress(body.product_id);
 
     return NextResponse.json(responseData, { status: 201 });
   } catch (error) {

@@ -164,7 +164,7 @@ function DetailsTabContent({
 
 
       {/* Other fields */}
-      {(Object.keys(feature) as (keyof Feature)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'status' && key !== 'progress' && key !== 'description').map((key) => {
+      {(Object.keys(feature) as (keyof Feature)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'status' && key !== 'progress' && key !== 'description' && key !== 'version_progress').map((key) => {
         const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         const isDateField = ['startdate', 'targetdate', 'completedon', 'start_date', 'target_date', 'completed_on'].includes(key.toLowerCase());
         return (

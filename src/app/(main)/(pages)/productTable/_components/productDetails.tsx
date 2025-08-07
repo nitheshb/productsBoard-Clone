@@ -112,7 +112,7 @@ function DetailsTabContent({
 
 
       <div className="flex flex-col gap-6 w-full">
-        {(Object.keys(product) as (keyof Product)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'created_at' && key !== 'components' && key !== 'progress' && key !== 'status' && key !== 'description').map((key) => {
+        {(Object.keys(product) as (keyof Product)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'created_at' && key !== 'components' && key !== 'progress' && key !== 'status' && key !== 'description' && key !== 'version_progress').map((key) => {
           const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
           const isDateField = ['startdate', 'targetdate', 'completedon'].includes(key.toLowerCase());
           return (
