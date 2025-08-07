@@ -5,6 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { updateProductProgressWithParents } from '@/utils/progressCalculator';
 
+// Helper function to determine status based on progress
+const getStatusFromProgress = (progress: number): string => {
+  if (progress === 0) {
+    return 'Todo';
+  } else if (progress === 100) {
+    return 'Completed';
+  } else {
+    return 'In Progress';
+  }
+};
+
 // Get a single component with its features
 export async function GET(
   request: NextRequest,
@@ -120,6 +131,11 @@ export async function PUT(
     delete updateFields.startDate;
     delete updateFields.targetDate;
     delete updateFields.completedOn;
+
+    // If progress is provided but status is not, automatically set status based on progress
+    if (updateData.progress !== undefined && updateData.status === undefined) {
+      updateFields.status = getStatusFromProgress(updateData.progress);
+    }
 
     const { data, error } = await supabase
       .from('components')

@@ -5,6 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { updateComponentProgressWithParents } from '@/utils/progressCalculator';
 
+// Helper function to determine status based on progress
+const getStatusFromProgress = (progress: number): string => {
+  if (progress === 0) {
+    return 'Todo';
+  } else if (progress === 100) {
+    return 'Completed';
+  } else {
+    return 'In Progress';
+  }
+};
+
 // Helper function to calculate progress from status
 const calculateProgressFromStatus = (status: string): number => {
   switch (status) {
@@ -38,6 +49,11 @@ export async function POST(request: NextRequest) {
     // If status is provided but progress isn't, calculate progress from status
     if (featureData.status && featureData.progress === undefined) {
       featureData.progress = calculateProgressFromStatus(featureData.status);
+    }
+
+    // If progress is provided but status isn't, automatically set status based on progress
+    if (featureData.progress !== undefined && !featureData.status) {
+      featureData.status = getStatusFromProgress(featureData.progress);
     }
 
     const { data, error } = await supabase

@@ -120,6 +120,8 @@ export function CreateComponentModal({
       toast.error("Product ID is null, cannot create/update component.");
       return;
     }
+    
+    setLoading(true);
     try {
       let data, error;
       if (componentId) {
@@ -170,6 +172,8 @@ export function CreateComponentModal({
       }
     } catch (error) {
       toast.error("Error creating/updating component: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setLoading(false);
     }
   };
 
