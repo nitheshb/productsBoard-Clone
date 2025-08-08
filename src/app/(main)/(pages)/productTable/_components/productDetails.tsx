@@ -4,10 +4,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Trash2, Loader2, Pencil } from 'lucide-react';
+import { Trash2, Loader2, Pencil, Flag, Gauge, Users, Timer, CalendarDays, StickyNote, Tag, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Product, Component as ComponentType } from '@/app/types'; // Assuming you have a Component type
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from "@/app/hooks/use-toast";
 import { toast } from "sonner";
@@ -61,12 +62,38 @@ function DetailsTabContent({
   onSave: () => Promise<void>;
   saving: boolean;
 }) {
+  const fieldIconFor = (key: string) => {
+    const iconClass = "h-4 w-4 text-gray-500 shrink-0";
+    switch (key.toLowerCase()) {
+      case 'status':
+        return <Flag className={iconClass} />;
+      case 'progress':
+        return <Gauge className={iconClass} />;
+      case 'team':
+        return <Users className={iconClass} />;
+      case 'days':
+        return <Timer className={iconClass} />;
+      case 'startdate':
+      case 'targetdate':
+      case 'completedon':
+        return <CalendarDays className={iconClass} />;
+      case 'remarks':
+        return <StickyNote className={iconClass} />;
+      case 'version':
+        return <Tag className={iconClass} />;
+      default:
+        return <Info className={iconClass} />;
+    }
+  };
   return (
-    <div className="mt-4 flex flex-col gap-6 w-full">
+    <div className="mt-2 flex flex-col gap-4 w-full">
       {/* Status and Progress fields */}
-      <div className="flex flex-col gap-6 w-full">
-      <div className="flex items-center gap-8 w-full">
-          <span className="text-black w-40 font-medium text-base">Status</span>
+      <div className="flex flex-col gap-4 w-full">
+      <div className="flex items-center gap-4 w-full">
+          <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+            {fieldIconFor('status')}
+            <span>Status</span>
+          </div>
           <div className="flex-1">
             {editingField === 'status' ? (
               <select
@@ -75,7 +102,7 @@ function DetailsTabContent({
                 onChange={e => handleInputChange('status', e.target.value)}
                 onBlur={() => handleInputBlur('status')}
                 onKeyDown={e => handleInputKeyPress(e as any, 'status')}
-                className="w-full p-2 border border-gray-300 rounded-md text-base h-10"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-9"
               >
                 <option value="Todo">Todo</option>
                 <option value="In Progress">In Progress</option>
@@ -83,12 +110,15 @@ function DetailsTabContent({
                 <option value="Blocked">Blocked</option>
               </select>
             ) : (
-              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('status')}>{product.status || 'Not assigned'}</span>
+              <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('status')}>{draftProduct.status || product.status || 'Not assigned'}</span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-8 w-full">
-          <span className="text-black w-40 font-medium text-base">Progress (%)</span>
+        <div className="flex items-center gap-4 w-full">
+          <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+            {fieldIconFor('progress')}
+            <span>Progress (%)</span>
+          </div>
           <div className="flex-1">
             {editingField === 'progress' ? (
               <Input
@@ -100,54 +130,183 @@ function DetailsTabContent({
                 onChange={e => handleInputChange('progress', e.target.value)}
                 onBlur={() => handleInputBlur('progress')}
                 onKeyDown={e => handleInputKeyPress(e, 'progress')}
-                className="w-full text-base h-10"
+                className="w-full text-sm h-9"
               />
             ) : (
-              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('progress')}>{product.progress !== undefined && product.progress !== null ? product.progress : 'Not assigned'}</span>
+              <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('progress')}>{draftProduct.progress !== undefined && draftProduct.progress !== null ? draftProduct.progress : product.progress !== undefined && product.progress !== null ? product.progress : 'Not assigned'}</span>
             )}
           </div>
         </div>
       </div>
-      {/* Other fields */}
+      {/* Team */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('team')}
+          <span>Team</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'team' ? (
+            <Input
+              ref={editInputRef}
+              type="text"
+              value={draftProduct?.team ?? ''}
+              onChange={e => handleInputChange('team', e.target.value)}
+              onBlur={() => handleInputBlur('team')}
+              onKeyDown={e => handleInputKeyPress(e, 'team')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('team')}>{product?.team ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
 
+      {/* Days */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('days')}
+          <span>Days</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'days' ? (
+            <Input
+              ref={editInputRef}
+              type="number"
+              value={draftProduct?.days ?? ''}
+              onChange={e => handleInputChange('days', e.target.value)}
+              onBlur={() => handleInputBlur('days')}
+              onKeyDown={e => handleInputKeyPress(e, 'days')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('days')}>{product?.days ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-6 w-full">
-        {(Object.keys(product) as (keyof Product)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'created_at' && key !== 'components' && key !== 'progress' && key !== 'status' && key !== 'description' && key !== 'version_progress').map((key) => {
-          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          const isDateField = ['startdate', 'targetdate', 'completedon'].includes(key.toLowerCase());
-          return (
-          <div key={key} className="flex items-center gap-8 w-full">
-              <span className="text-black w-40 font-medium text-base">{label}</span>
-              <div className="flex-1 relative">
-              {editingField === key ? (
-                  isDateField ? (
-                    <Input
-                      ref={editInputRef}
-                      type="date"
-                      value={typeof draftProduct[key] === 'string' ? draftProduct[key].slice(0, 10) : draftProduct[key] ? String(draftProduct[key]).slice(0, 10) : ''}
-                      onChange={(e) => handleInputChange(key, e.target.value)}
-                      onBlur={() => handleInputBlur(key)}
-                      onKeyDown={(e) => handleInputKeyPress(e, key)}
-                      className="w-full text-base h-10"
-                    />
-                  ) : (
-                <Input
-                  ref={editInputRef}
-                  type="text"
-                  value={draftProduct[key] !== null && draftProduct[key] !== undefined ? String(draftProduct[key]) : ''}
-                  onChange={(e) => handleInputChange(key, e.target.value)}
-                  onBlur={() => handleInputBlur(key)}
-                  onKeyDown={(e) => handleInputKeyPress(e, key)}
-                      className="w-full text-base h-10"
-                />
-                  )
-              ) : (
-                  <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField(key)}>{product[key] !== null && product[key] !== undefined ? String(product[key]) : 'Not assigned'}</span>
-              )}
-            </div>
-          </div>
-          );
-        })}
+      {/* Start Date */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('startdate')}
+          <span>Start Date</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'startdate' ? (
+            <Input
+              ref={editInputRef}
+              type="date"
+              value={typeof draftProduct?.startdate === 'string' ? draftProduct.startdate.slice(0, 10) : draftProduct?.startdate ? String(draftProduct.startdate).slice(0, 10) : ''}
+              onChange={e => handleInputChange('startdate', e.target.value)}
+              onBlur={() => handleInputBlur('startdate')}
+              onKeyDown={e => handleInputKeyPress(e, 'startdate')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('startdate')}>{product?.startdate ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Target Date */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('targetdate')}
+          <span>Target Date</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'targetdate' ? (
+            <Input
+              ref={editInputRef}
+              type="date"
+              value={typeof draftProduct?.targetdate === 'string' ? draftProduct.targetdate.slice(0, 10) : draftProduct?.targetdate ? String(draftProduct.targetdate).slice(0, 10) : ''}
+              onChange={e => handleInputChange('targetdate', e.target.value)}
+              onBlur={() => handleInputBlur('targetdate')}
+              onKeyDown={e => handleInputKeyPress(e, 'targetdate')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('targetdate')}>{product?.targetdate ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Completed On */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('completedon')}
+          <span>Completed On</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'completedon' ? (
+            <Input
+              ref={editInputRef}
+              type="date"
+              value={typeof draftProduct?.completedon === 'string' ? draftProduct.completedon.slice(0, 10) : draftProduct?.completedon ? String(draftProduct.completedon).slice(0, 10) : ''}
+              onChange={e => handleInputChange('completedon', e.target.value)}
+              onBlur={() => handleInputBlur('completedon')}
+              onKeyDown={e => handleInputKeyPress(e, 'completedon')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('completedon')}>{product?.completedon ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Remarks */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('remarks')}
+          <span>Remarks</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'remarks' ? (
+            <Input
+              ref={editInputRef}
+              type="text"
+              value={draftProduct?.remarks ?? ''}
+              onChange={e => handleInputChange('remarks', e.target.value)}
+              onBlur={() => handleInputBlur('remarks')}
+              onKeyDown={e => handleInputKeyPress(e, 'remarks')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('remarks')}>{product?.remarks ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Version */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('version')}
+          <span>Version</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'version' ? (
+            <Input
+              ref={editInputRef}
+              type="text"
+              value={draftProduct?.version ?? ''}
+              onChange={e => handleInputChange('version', e.target.value)}
+              onBlur={() => handleInputBlur('version')}
+              onKeyDown={e => handleInputKeyPress(e, 'version')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('version')}>{product?.version ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Description full-width textbox with light pink background (no title) */}
+      <div className="w-full mt-2">
+        <Textarea
+          value={draftProduct?.description || ''}
+          onChange={(e) => handleInputChange('description', e.target.value)}
+          className="w-full text-sm min-h-[80px] bg-rose-50 border border-rose-200 focus:border-rose-300 focus:outline-none"
+          placeholder="Add a description..."
+        />
       </div>
     </div>
   );
@@ -214,14 +373,32 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
   };
 
   const handleInputChange = (field: keyof Product, value: any) => {
-    setDraftProduct(prev => prev ? { ...prev, [field]: value } : null);
+    setDraftProduct(prev => {
+      if (!prev) return null;
+      
+      const updatedDraft = { ...prev, [field]: value };
+      
+      // Automatically update status based on progress
+      if (field === 'progress') {
+        const progressValue = parseInt(value) || 0;
+        let newStatus = prev.status;
+        
+        if (progressValue === 0) {
+          newStatus = 'Todo';
+        } else if (progressValue === 100) {
+          newStatus = 'Completed';
+        } else if (progressValue > 0 && progressValue < 100) {
+          newStatus = 'In Progress';
+        }
+        
+        updatedDraft.status = newStatus;
+      }
+      
+      return updatedDraft;
+    });
   };
 
   const handleInputBlur = async (field: keyof Product) => {
-    // Auto-save for title and description fields
-    if (field === 'name' || field === 'description') {
-      await saveChanges(true);
-    }
     // Only close the field if we're not switching to another field
     // Use a small delay to check if focus moved to another editable field
     setTimeout(() => {
@@ -240,10 +417,6 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
 
   const handleInputKeyPress = async (event: React.KeyboardEvent<HTMLInputElement>, field: keyof Product) => {
     if (event.key === 'Enter') {
-      // Auto-save for title and description fields
-      if (field === 'name' || field === 'description') {
-        await saveChanges(true);
-      }
       setEditingField(null);
     } else if (event.key === 'Escape') {
       setDraftProduct(product ? { ...product, id: product.id || '' } : null); // Revert changes
@@ -347,10 +520,10 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
   return (
     <div className="p-6">
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="sm:max-w-2xl w-full max-w-2xl p-0 rounded-lg shadow-lg flex flex-col h-full">
+        <SheetContent className="sm:max-w-lg w-full max-w-lg p-0 rounded-lg shadow-lg flex flex-col h-full">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 p-8 pb-4">
-            <SheetHeader className="flex flex-col items-start gap-4">
+          <div className="flex-shrink-0 p-4 pb-2">
+            <SheetHeader className="flex flex-col items-start gap-3">
               <div className="flex items-center justify-between w-full">
                 <div className="relative w-full flex items-center">
                                   <div className="flex-1 flex items-center">
@@ -376,28 +549,7 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
                 </div>
               </div>
 
-              {/* Description subtitle */}
-              <div className="w-full">
-                {editingField === 'description' ? (
-                  <Input
-                    ref={editInputRef}
-                    type="text"
-                    value={draftProduct?.description || ''}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    onBlur={() => handleInputBlur('description')}
-                    onKeyDown={(e) => handleInputKeyPress(e, 'description')}
-                    className="w-full text-sm font-semibold text-gray-600 border-2 border-gray-200 focus:border-gray-400 bg-gray-50 px-4 py-2 rounded"
-                    placeholder="Enter description"
-                  />
-                ) : (
-                  <p 
-                    className="text-sm font-semibold text-gray-600 w-full cursor-pointer hover:text-gray-800 transition-colors"
-                    onClick={() => setEditingField('description')}
-                  >
-                    {product?.description || 'Click to add description'}
-                  </p>
-                )}
-              </div>
+              {/* Description moved below in details section */}
 
               {/* Tab Navigation */}
               <div className="mt-2 border-b w-full flex gap-6">
@@ -445,7 +597,7 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
           </div>
 
           {/* Fixed Footer with Save Button */}
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 p-3">
             <div className="flex justify-between items-center">
               <Button
                 onClick={handleDelete}

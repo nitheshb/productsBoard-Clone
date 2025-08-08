@@ -14,18 +14,7 @@ const getStatusFromProgress = (progress: number): string => {
   }
 };
 
-// Helper function to calculate progress from status
-const calculateProgressFromStatus = (status: string): number => {
-  switch (status) {
-    case 'Completed':
-      return 100;
-    case 'In Progress':
-      return 50;
-    case 'Todo':
-    default:
-      return 0;
-  }
-};
+
 
 // Get a single feature
 export async function GET(
@@ -86,41 +75,65 @@ export async function PUT(
       progress: body.progress ?? null,
       team: body.team ?? null,
       days: body.days ?? null,
-      startdate: body.startDate ?? body.startdate ?? null,
-      targetdate: body.targetDate ?? body.targetdate ?? null,
-      completedon: body.completedOn ?? body.completedon ?? null,
+      startdate: body.startdate ?? null,
+      targetdate: body.targetdate ?? null,
+      completedon: body.completedon ?? null,
       remarks: body.remarks ?? null,
       description: body.description ?? null,
       version: body.version ?? null,
-      color: body.color ?? null,
-      owner_initials: body.owner_initials ?? null,
       component_id: body.component_id ?? null
     };
 
-    // If progress is provided but status is not, automatically set status based on progress
-    if (body.progress !== undefined && body.status === undefined) {
+    // Remove any undefined values to prevent database errors
+    Object.keys(updateFields).forEach(key => {
+      if (updateFields[key] === undefined) {
+        updateFields[key] = null;
+      }
+    });
+
+    // If progress is provided, automatically set status based on progress
+    if (body.progress !== undefined) {
       updateFields.status = getStatusFromProgress(body.progress);
     }
 
-    const { data, error } = await supabase
-      .from('features')
-      .update(updateFields)
-      .eq('id', id)
-      .select();
+    console.log('Updating feature with fields:', updateFields);
+    
+    let updateData;
+    try {
+      const { data, error } = await supabase
+        .from('features')
+        .update(updateFields)
+        .eq('id', id)
+        .select();
 
-    if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+
+      updateData = data;
+      console.log('Supabase update successful, data:', data);
+    } catch (updateError) {
+      console.error('Error during Supabase update:', updateError);
+      console.error('Update error details:', JSON.stringify(updateError, null, 2));
+      throw updateError;
+    }
 
     // Update component progress and version progress
     if (existingFeature?.component_id) {
       try {
+        console.log('Updating component progress for component_id:', existingFeature.component_id);
         await updateComponentProgressWithParents(existingFeature.component_id);
+        console.log('Component progress updated successfully');
       } catch (progressError) {
         console.error('Error updating component progress:', progressError);
+        console.error('Progress error details:', JSON.stringify(progressError, null, 2));
         // Don't fail the feature update if progress update fails
       }
     }
 
-    return NextResponse.json(data[0]);
+    return NextResponse.json(updateData[0]);
   } catch (error) {
     console.error('Error updating feature:', error);
     return NextResponse.json({ error: 'Failed to update feature' }, { status: 500 });

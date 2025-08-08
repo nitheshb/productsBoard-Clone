@@ -1405,15 +1405,24 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               </div>
               {/* Add the Plus button only for components (level 1) to create features */}
               {child.level === 1 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCreateFeatureClick(child.id);
-                  }}
-                  className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <img className="w-4 h-4" src="/add.svg" alt="Add" />
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreateFeatureClick(child.id);
+                        }}
+                        className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors"
+                      >
+                        <img className="w-4 h-4" src="/add.svg" alt="Add" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="center">
+                      Add feature
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </TableCell>

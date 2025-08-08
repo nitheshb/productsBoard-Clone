@@ -105,10 +105,30 @@ export function CreateComponentModal({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "progress" ? parseInt(value) || 0 : value,
-    }));
+    setFormData((prev) => {
+      const updatedData = {
+        ...prev,
+        [name]: name === "progress" ? parseInt(value) || 0 : value,
+      };
+      
+      // Automatically update status based on progress
+      if (name === 'progress') {
+        const progressValue = parseInt(value) || 0;
+        let newStatus = prev.status;
+        
+        if (progressValue === 0) {
+          newStatus = 'Todo';
+        } else if (progressValue === 100) {
+          newStatus = 'Completed';
+        } else if (progressValue > 0 && progressValue < 100) {
+          newStatus = 'In Progress';
+        }
+        
+        updatedData.status = newStatus;
+      }
+      
+      return updatedData;
+    });
   };
 
   const handleTabChange = (tab: 'details' | 'insights' | 'portal') => {

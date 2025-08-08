@@ -4,9 +4,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Trash2, MoreVertical, Loader2, Pencil } from 'lucide-react';
+import { Trash2, MoreVertical, Loader2, Pencil, Flag, Gauge, Users, Timer, CalendarDays, StickyNote, Tag, Info } from 'lucide-react';
 import { Component as ComponentType, Feature } from '@/app/types'; // Assuming these types exist
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from "@/app/hooks/use-toast";
 import { toast } from "sonner";
@@ -46,6 +47,7 @@ function DetailsTabContent({
   handleInputKeyPress,
   onSave, // <-- new prop
   saving, // <-- new prop
+  productName,
 }: {
   component: ComponentType;
   draftComponent: ComponentType;
@@ -58,93 +60,268 @@ function DetailsTabContent({
   handleInputKeyPress: (event: React.KeyboardEvent<HTMLInputElement>, field: keyof ComponentType) => Promise<void>;
   onSave: () => Promise<void>;
   saving: boolean;
+  productName?: string | null;
 }) {
+  const fieldIconFor = (key: string) => {
+    const iconClass = "h-4 w-4 text-gray-500 shrink-0";
+    switch (key.toLowerCase()) {
+      case 'status':
+        return <Flag className={iconClass} />;
+      case 'progress':
+        return <Gauge className={iconClass} />;
+      case 'team':
+        return <Users className={iconClass} />;
+      case 'days':
+        return <Timer className={iconClass} />;
+      case 'startdate':
+      case 'targetdate':
+      case 'completedon':
+        return <CalendarDays className={iconClass} />;
+      case 'remarks':
+        return <StickyNote className={iconClass} />;
+      case 'version':
+        return <Tag className={iconClass} />;
+      default:
+        return <Info className={iconClass} />;
+    }
+  };
+
   return (
-    <div className="mt-4 flex flex-col gap-6 w-full">
-      {/* Other fields */}
-      <div className="flex flex-col gap-6 w-full">
-        <div className="flex items-center gap-8 w-full">
-          <span className="text-gray-700 w-40 font-medium text-base">Status</span>
-          <div className="flex-1">
-            {editingField === 'status' ? (
-              <select
-                ref={editInputRef as any}
-                value={draftComponent.status || ''}
-                onChange={e => handleInputChange('status', e.target.value)}
-                onBlur={() => handleInputBlur('status')}
-                onKeyDown={e => handleInputKeyPress(e as any, 'status')}
-                className="w-full p-2 border border-gray-300 rounded-md text-base h-10"
-              >
-                <option value="Todo">Todo</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Blocked">Blocked</option>
-              </select>
-            ) : (
-              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('status')}>{component.status || 'Not assigned'}</span>
-            )}
-          </div>
+    <div className="mt-2 flex flex-col gap-4 w-full">
+      {/* Status */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('status')}
+          <span>Status</span>
         </div>
-      <div className="flex items-center gap-8 w-full">
-          <span className="text-gray-700 w-40 font-medium text-base">Progress (%)</span>
-          <div className="flex-1">
-            {editingField === 'progress' ? (
-              <Input
-                ref={editInputRef}
-              type="number"
-              min={0}
-              max={100}
-                value={draftComponent.progress === null || draftComponent.progress === undefined ? '' : draftComponent.progress}
-                onChange={e => handleInputChange('progress', e.target.value)}
-              onBlur={() => handleInputBlur('progress')}
-              onKeyDown={e => handleInputKeyPress(e, 'progress')}
-                className="w-full text-base h-10"
-            />
-            ) : (
-              <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField('progress')}>{component.progress !== undefined && component.progress !== null ? component.progress : 'Not assigned'}</span>
-            )}
-          </div>
+        <div className="flex-1">
+          {editingField === 'status' ? (
+            <select
+              ref={editInputRef as any}
+              value={draftComponent.status || ''}
+              onChange={e => handleInputChange('status', e.target.value)}
+              onBlur={() => handleInputBlur('status')}
+              onKeyDown={e => handleInputKeyPress(e as any, 'status')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-9"
+            >
+              <option value="Todo">Todo</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('status')}>{draftComponent.status || component.status || 'Not assigned'}</span>
+          )}
         </div>
       </div>
 
+      {/* Progress */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('progress')}
+          <span>Progress (%)</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'progress' ? (
+            <Input
+              ref={editInputRef}
+              type="number"
+              min={0}
+              max={100}
+              value={draftComponent.progress === null || draftComponent.progress === undefined ? '' : draftComponent.progress}
+              onChange={e => handleInputChange('progress', e.target.value)}
+              onBlur={() => handleInputBlur('progress')}
+              onKeyDown={e => handleInputKeyPress(e, 'progress')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('progress')}>{draftComponent.progress !== undefined && draftComponent.progress !== null ? draftComponent.progress : component.progress !== undefined && component.progress !== null ? component.progress : 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-6 w-full">
-        {(Object.keys(component) as (keyof ComponentType)[]).filter(key => key !== 'id' && key !== 'name' && key !== 'features' && key !== 'progress' && key !== 'status' && key !== 'description' && key !== 'version_progress').map((key) => {
-          const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          const isDateField = (key: string) => ['startdate', 'targetdate', 'completedon'].includes(key);
-          return (
-          <div key={key} className="flex items-center gap-8 w-full">
-              <span className="text-gray-700 w-40 font-medium text-base">{label}</span>
-              <div className="flex-1 relative">
-              {editingField === key ? (
-                  isDateField(key) ? (
-                    <Input
-                      ref={editInputRef}
-                      type="date"
-                      value={typeof draftComponent[key] === 'string' ? draftComponent[key].slice(0, 10) : draftComponent[key] ? String(draftComponent[key]).slice(0, 10) : ''}
-                      onChange={(e) => handleInputChange(key, e.target.value)}
-                      onBlur={() => handleInputBlur(key)}
-                      onKeyDown={(e) => handleInputKeyPress(e, key)}
-                      className="w-full text-base h-10"
-                    />
-                  ) : (
-                <Input
-                  ref={editInputRef}
-                  type="text"
-                  value={draftComponent[key] !== null && draftComponent[key] !== undefined ? String(draftComponent[key]) : ''}
-                  onChange={(e) => handleInputChange(key, e.target.value)}
-                  onBlur={() => handleInputBlur(key)}
-                  onKeyDown={(e) => handleInputKeyPress(e, key)}
-                      className="w-full text-base h-10"
-                />
-                  )
+      {/* Product (read-only name) */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('product_id')}
+          <span>Product</span>
+        </div>
+        <div className="flex-1">
+          <span className="block text-gray-800 min-h-[28px] text-sm">
+            {productName ?? (component as any)?.product_id ?? 'Not assigned'}
+          </span>
+        </div>
+      </div>
+
+      {/* Team */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('team')}
+          <span>Team</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'team' ? (
+            <Input
+              ref={editInputRef}
+              type="text"
+              value={draftComponent?.team ?? ''}
+              onChange={e => handleInputChange('team', e.target.value)}
+              onBlur={() => handleInputBlur('team')}
+              onKeyDown={e => handleInputKeyPress(e, 'team')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('team')}>{component?.team ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Days */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('days')}
+          <span>Days</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'days' ? (
+            <Input
+              ref={editInputRef}
+              type="number"
+              value={draftComponent?.days ?? ''}
+              onChange={e => handleInputChange('days', e.target.value)}
+              onBlur={() => handleInputBlur('days')}
+              onKeyDown={e => handleInputKeyPress(e, 'days')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('days')}>{component?.days ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Start Date */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('startdate')}
+          <span>Start Date</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'startdate' ? (
+            <Input
+              ref={editInputRef}
+              type="date"
+              value={typeof draftComponent?.startdate === 'string' ? draftComponent.startdate.slice(0, 10) : draftComponent?.startdate ? String(draftComponent.startdate).slice(0, 10) : ''}
+              onChange={e => handleInputChange('startdate', e.target.value)}
+              onBlur={() => handleInputBlur('startdate')}
+              onKeyDown={e => handleInputKeyPress(e, 'startdate')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('startdate')}>{component?.startdate ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Target Date */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('targetdate')}
+          <span>Target Date</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'targetdate' ? (
+            <Input
+              ref={editInputRef}
+              type="date"
+              value={typeof draftComponent?.targetdate === 'string' ? draftComponent.targetdate.slice(0, 10) : draftComponent?.targetdate ? String(draftComponent.targetdate).slice(0, 10) : ''}
+              onChange={e => handleInputChange('targetdate', e.target.value)}
+              onBlur={() => handleInputBlur('targetdate')}
+              onKeyDown={e => handleInputKeyPress(e, 'targetdate')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('targetdate')}>{component?.targetdate ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Completed On */}
+      <div className="flex items-center gap-4 w-full">
+            <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('completedon')}
+          <span>Completed On</span>
+            </div>
+        <div className="flex-1">
+          {editingField === 'completedon' ? (
+                  <Input
+                    ref={editInputRef}
+                    type="date"
+              value={typeof draftComponent?.completedon === 'string' ? draftComponent.completedon.slice(0, 10) : draftComponent?.completedon ? String(draftComponent.completedon).slice(0, 10) : ''}
+              onChange={e => handleInputChange('completedon', e.target.value)}
+              onBlur={() => handleInputBlur('completedon')}
+              onKeyDown={e => handleInputKeyPress(e, 'completedon')}
+              className="w-full text-sm h-9"
+            />
+          ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('completedon')}>{component?.completedon ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Remarks */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('remarks')}
+          <span>Remarks</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'remarks' ? (
+            <Input
+              ref={editInputRef}
+              type="text"
+              value={draftComponent?.remarks ?? ''}
+              onChange={e => handleInputChange('remarks', e.target.value)}
+              onBlur={() => handleInputBlur('remarks')}
+              onKeyDown={e => handleInputKeyPress(e, 'remarks')}
+                    className="w-full text-sm h-9"
+                  />
+                ) : (
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('remarks')}>{component?.remarks ?? 'Not assigned'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Version */}
+      <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center w-40 min-w-[120px] gap-2 text-[13px] text-[#30363c] font-medium">
+          {fieldIconFor('version')}
+          <span>Version</span>
+        </div>
+        <div className="flex-1">
+          {editingField === 'version' ? (
+                  <Input
+                    ref={editInputRef}
+                    type="text"
+              value={draftComponent?.version ?? ''}
+              onChange={e => handleInputChange('version', e.target.value)}
+              onBlur={() => handleInputBlur('version')}
+              onKeyDown={e => handleInputKeyPress(e, 'version')}
+                    className="w-full text-sm h-9"
+                  />
               ) : (
-                  <span className="block text-gray-800 min-h-[28px] text-base cursor-pointer" onClick={() => setEditingField(key)}>{component[key] !== null && component[key] !== undefined ? String(component[key]) : 'Not assigned'}</span>
+            <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('version')}>{component?.version ?? 'Not assigned'}</span>
               )}
             </div>
           </div>
-          );
-        })}
+
+      {/* Description full-width textbox with light pink background (no title) */}
+      <div className="w-full mt-2">
+        <Textarea
+          value={draftComponent?.description || ''}
+          onChange={(e) => handleInputChange('description', e.target.value)}
+          className="w-full text-sm min-h-[80px] bg-rose-50 border border-rose-200 focus:border-rose-300 focus:outline-none"
+          placeholder="Add a description..."
+        />
       </div>
     </div>
   );
@@ -170,6 +347,7 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast: showToast } = useToast();
+  const [productName, setProductName] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && componentId) {
@@ -194,6 +372,23 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
           const data: ComponentType = await response.json();
           setComponent(data);
           setDraftComponent({ ...data, id: data.id || '' });
+
+          // Fetch and set the parent product name for display
+          try {
+            if ((data as any)?.product_id) {
+              const productResp = await fetch(`/api/product/${(data as any).product_id}`);
+              if (productResp.ok) {
+                const productData = await productResp.json();
+                setProductName(productData?.name ?? null);
+              } else {
+                setProductName(null);
+              }
+            } else {
+              setProductName(null);
+            }
+          } catch {
+            setProductName(null);
+          }
         } catch (err: any) {
           console.error('Error fetching component details:', err);
           setError(err.message);
@@ -207,6 +402,7 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
       setDraftComponent(null);
       setEditingField(null);
       setActiveTab('details');
+      setProductName(null);
     }
   }, [isOpen, componentId]);
 
@@ -221,14 +417,32 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
   };
 
   const handleInputChange = (field: keyof ComponentType, value: any) => {
-    setDraftComponent(prev => prev ? { ...prev, [field]: value } : null);
+    setDraftComponent(prev => {
+      if (!prev) return null;
+      
+      const updatedDraft = { ...prev, [field]: value };
+      
+      // Automatically update status based on progress
+      if (field === 'progress') {
+        const progressValue = parseInt(value) || 0;
+        let newStatus = prev.status;
+        
+        if (progressValue === 0) {
+          newStatus = 'Todo';
+        } else if (progressValue === 100) {
+          newStatus = 'Completed';
+        } else if (progressValue > 0 && progressValue < 100) {
+          newStatus = 'In Progress';
+        }
+        
+        updatedDraft.status = newStatus;
+      }
+      
+      return updatedDraft;
+    });
   };
 
   const handleInputBlur = async (field: keyof ComponentType) => {
-    // Auto-save for title and description fields
-    if (field === 'name' || field === 'description') {
-      await saveChanges(true);
-    }
     // Only close the field if we're not switching to another field
     // Use a small delay to check if focus moved to another editable field
     setTimeout(() => {
@@ -247,10 +461,6 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
 
   const handleInputKeyPress = async (event: React.KeyboardEvent<HTMLInputElement>, field: keyof ComponentType) => {
     if (event.key === 'Enter') {
-      // Auto-save for title and description fields
-      if (field === 'name' || field === 'description') {
-        await saveChanges(true);
-      }
       setEditingField(null);
     } else if (event.key === 'Escape') {
       setDraftComponent(component ? { ...component, id: component.id || '' } : null); // Revert changes
@@ -349,13 +559,13 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
   return (
     <div className="p-6">
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="sm:max-w-2xl w-full max-w-2xl p-0 rounded-lg shadow-lg flex flex-col h-full">
+        <SheetContent className="sm:max-w-lg w-full max-w-lg p-0 rounded-lg shadow-lg flex flex-col h-full">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 p-8 pb-4">
-            <SheetHeader className="flex flex-col items-start gap-4">
+          <div className="flex-shrink-0 p-4 pb-2">
+            <SheetHeader className="flex flex-col items-start gap-3">
               <div className="flex items-center justify-between w-full mb-2">
                 <div className="relative w-full flex items-center">
-                                    <div className="flex-1 flex items-center">
+                  <div className="flex-1 flex items-center">
                     {editingField === 'name' ? (
                       <Input
                         ref={editInputRef}
@@ -378,28 +588,6 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
                 </div>
               </div>
 
-              {/* Description subtitle */}
-              <div className="w-full mt-1">
-                {editingField === 'description' ? (
-                  <Input
-                    ref={editInputRef}
-                    type="text"
-                    value={draftComponent?.description || ''}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    onBlur={() => handleInputBlur('description')}
-                    onKeyDown={(e) => handleInputKeyPress(e, 'description')}
-                    className="w-full text-sm font-semibold text-gray-600 border-2 border-gray-200 focus:border-gray-400 bg-gray-50 px-4 py-2 rounded"
-                    placeholder="Enter description"
-                  />
-                ) : (
-                  <p 
-                    className="text-sm font-semibold text-gray-600 w-full cursor-pointer hover:text-gray-800 transition-colors"
-                    onClick={() => setEditingField('description')}
-                  >
-                    {component?.description || 'Click to add description'}
-                  </p>
-                )}
-              </div>
               {/* Tab Navigation */}
               <div className="mt-2 border-b w-full flex gap-6">
                 <ComponentDetailsTab
@@ -437,19 +625,22 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
                 {error}
               </div>
             ) : component && draftComponent ? (
-              <DetailsTabContent
-                component={component}
-                draftComponent={draftComponent}
-                editingField={editingField}
-                setEditingField={setEditingField}
-                editInputRef={editInputRef}
-                handleFieldHover={handleFieldHover}
-                handleInputChange={handleInputChange}
-                handleInputBlur={handleInputBlur}
-                handleInputKeyPress={handleInputKeyPress}
-                onSave={() => saveChanges(false)}
-                saving={saving}
-              />
+              <div className="bg-white rounded-lg shadow p-6 mt-2">
+                <DetailsTabContent
+                  component={component}
+                  draftComponent={draftComponent}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  editInputRef={editInputRef}
+                  handleFieldHover={handleFieldHover}
+                  handleInputChange={handleInputChange}
+                  handleInputBlur={handleInputBlur}
+                  handleInputKeyPress={handleInputKeyPress}
+                  onSave={() => saveChanges(false)}
+                  saving={saving}
+                  productName={productName}
+                />
+              </div>
             ) : (
               <div className="mt-4">No component data available</div>
             )}
@@ -458,7 +649,7 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
           </div>
 
           {/* Fixed Footer with Save Button */}
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 p-3">
             <div className="flex justify-between items-center">
               <Button
                 onClick={handleDelete}

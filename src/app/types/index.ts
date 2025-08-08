@@ -21,7 +21,6 @@ export interface Product {
   completedon?: string;
   remarks?: string;
   description?: string;
-  owner?: string;
   created_at: string;
   components?: Component[];
 }
@@ -61,10 +60,8 @@ export interface Feature {
   description?: string;
   version?: string;
   version_progress?: VersionProgress[];
-  color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
-  owner?: string;
-  
+  updated_at?: string;
 }
 
 

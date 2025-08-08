@@ -65,13 +65,11 @@ export async function POST(request: NextRequest) {
         progress: featureData.progress !== undefined ? featureData.progress : 0,
         team: featureData.team || null,
         days: featureData.days !== undefined ? featureData.days : null,
-        startdate: featureData.startDate || null,
-        targetdate: featureData.targetDate || null,
-        completedon: featureData.completedOn || null,
+        startdate: featureData.startdate || null,
+        targetdate: featureData.targetdate || null,
+        completedon: featureData.completedon || null,
         remarks: featureData.remarks || null,
         description: featureData.description || null,
-        owner_initials: featureData.owner_initials || null,
-        color: featureData.color || null,
         version: featureData.version || '1.0.0'
       }])
       .select();

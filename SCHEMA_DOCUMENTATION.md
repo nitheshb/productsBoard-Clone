@@ -19,7 +19,6 @@ CREATE TABLE products (
     remarks TEXT,
     description TEXT,
     version VARCHAR(50) DEFAULT '1.0.0',
-    owner_initials TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -97,7 +96,6 @@ CREATE TABLE features (
     description TEXT,
     version VARCHAR(50) DEFAULT '1.0.0',
     color TEXT,
-    owner_initials TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -118,7 +116,6 @@ CREATE TABLE features (
 - `description` - Feature description (optional)
 - `version` - Version identifier (default: '1.0.0')
 - `color` - UI color identifier (optional)
-- `owner_initials` - Owner initials (optional)
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 
@@ -198,7 +195,6 @@ export interface Product {
   version?: string;
   created_at: string;
   components?: Component[];
-  owner?: string;
 }
 ```
 
@@ -241,7 +237,6 @@ export interface Feature {
   version?: string;
   color?: 'yellow' | 'teal' | 'blue' | string;
   created_at: string;
-  owner?: string;
 }
 ```
 
@@ -296,7 +291,6 @@ export interface TableItem {
     completedOn?: string;
     remarks?: string;
     version?: string;       // Default: '1.0.0'
-    owner_initials?: string;
   }
   ```
 

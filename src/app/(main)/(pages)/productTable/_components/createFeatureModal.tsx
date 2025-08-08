@@ -55,9 +55,9 @@ export function CreateFeatureModal({
     progress: 0,
     team: "",
     days: null,
-    startDate: null,
-    targetDate: null,
-    completedOn: null,
+    startdate: null,
+    targetdate: null,
+    completedon: null,
     remarks: "",
     description: "",
     version: "1.0.0",
@@ -80,9 +80,9 @@ export function CreateFeatureModal({
             progress: data.progress || 0,
             team: data.team || "",
             days: data.days ?? null,
-            startDate: data.startDate || null,
-            targetDate: data.targetDate || null,
-            completedOn: data.completedOn || null,
+            startdate: data.startdate || null,
+            targetdate: data.targetdate || null,
+            completedon: data.completedon || null,
             remarks: data.remarks || "",
             description: data.description || "",
             version: data.version || "1.0.0",
@@ -96,9 +96,9 @@ export function CreateFeatureModal({
         progress: 0,
         team: "",
         days: null,
-        startDate: null,
-        targetDate: null,
-        completedOn: null,
+        startdate: null,
+        targetdate: null,
+        completedon: null,
         remarks: "",
         description: "",
         version: "1.0.0",
@@ -112,10 +112,30 @@ export function CreateFeatureModal({
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value === "" ? null : value,
-    }));
+    setFormData((prev) => {
+      const updatedData = {
+        ...prev,
+        [name]: value === "" ? null : value,
+      };
+      
+      // Automatically update status based on progress
+      if (name === 'progress') {
+        const progressValue = parseInt(value) || 0;
+        let newStatus = prev.status;
+        
+        if (progressValue === 0) {
+          newStatus = 'Todo';
+        } else if (progressValue === 100) {
+          newStatus = 'Completed';
+        } else if (progressValue > 0 && progressValue < 100) {
+          newStatus = 'In Progress';
+        }
+        
+        updatedData.status = newStatus;
+      }
+      
+      return updatedData;
+    });
   };
 
   const handleTabChange = (tab: string) => {
@@ -193,9 +213,9 @@ export function CreateFeatureModal({
         progress: 0,
         team: "",
         days: null,
-        startDate: null,
-        targetDate: null,
-        completedOn: null,
+        startdate: null,
+        targetdate: null,
+        completedon: null,
         remarks: "",
         description: "",
         version: "1.0.0",
@@ -287,9 +307,9 @@ export function CreateFeatureModal({
         <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Start Date</span>
         <Input
           type="date"
-          id="startDate"
-          name="startDate"
-          value={formData.startDate === null ? "" : formData.startDate}
+          id="startdate"
+          name="startdate"
+          value={formData.startdate === null ? "" : formData.startdate}
           onChange={handleChange}
           className="w-full h-[32px] bg-white border border-gray-300 focus:border-blue-500 focus:outline-none"
         />
@@ -300,9 +320,9 @@ export function CreateFeatureModal({
         <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Target Date</span>
         <Input
           type="date"
-          id="targetDate"
-          name="targetDate"
-          value={formData.targetDate === null ? "" : formData.targetDate}
+          id="targetdate"
+          name="targetdate"
+          value={formData.targetdate === null ? "" : formData.targetdate}
           onChange={handleChange}
           className="w-full h-[32px] bg-white border border-gray-300 focus:border-blue-500 focus:outline-none"
         />
@@ -313,9 +333,9 @@ export function CreateFeatureModal({
         <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Completed On</span>
         <Input
           type="date"
-          id="completedOn"
-          name="completedOn"
-          value={formData.completedOn === null ? "" : formData.completedOn}
+          id="completedon"
+          name="completedon"
+          value={formData.completedon === null ? "" : formData.completedon}
           onChange={handleChange}
           className="w-full h-[32px] bg-white border border-gray-300 focus:border-blue-500 focus:outline-none"
         />
@@ -400,7 +420,7 @@ export function CreateFeatureModal({
         <form onSubmit={handleSubmit} className="h-full flex flex-col">
           <SheetHeader className="flex flex-col items-start gap-2">
             <div className="flex flex-col justify-between w-full">
-              <section className="flex gap-2 flex-row justify-between">
+              {/* <section className="flex gap-2 flex-row justify-between">
                 <div className="flex flex-row">
                   <span className="text-[#ffc600] mt-[2px] mr-[8px]">
                     <svg
@@ -421,7 +441,7 @@ export function CreateFeatureModal({
                     {featureId ? 'Edit Feature' : 'New Feature'}
                   </span>
                 </div>
-              </section>
+              </section> */}
               <SheetTitle className="text-lg font-semibold text-[#202428] mt-2">
                 {featureId ? 'Edit Feature' : 'Create New Feature'}
               </SheetTitle>

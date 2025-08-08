@@ -118,7 +118,22 @@ export async function PUT(
     }
     if (body.remarks !== undefined) updateFields.remarks = body.remarks;
     if (body.description !== undefined) updateFields.description = body.description;
-    if (body.owner !== undefined) updateFields.owner = body.owner;
+
+    // Helper function to determine status based on progress
+    const getStatusFromProgress = (progress: number): string => {
+      if (progress === 0) {
+        return 'Todo';
+      } else if (progress === 100) {
+        return 'Completed';
+      } else {
+        return 'In Progress';
+      }
+    };
+
+    // If progress is provided, automatically set status based on progress
+    if (body.progress !== undefined) {
+      updateFields.status = getStatusFromProgress(body.progress);
+    }
 
     const { data, error } = await supabase
       .from('products')

@@ -30,7 +30,6 @@ export interface Product {
   name: string;
   progress: number;
   status?: string;
-  owner?: string;
   components?: Component[];
 }
 

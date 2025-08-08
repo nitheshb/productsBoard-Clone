@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     // Fetch products only, with columns matching the schema
     let query = supabase
       .from('products')
-      .select('id, name, status, progress, version, team, days, startdate, targetdate, completedon, remarks, description, owner_initials, created_at, updated_at') // Fixed: owner_initials, added updated_at
+      .select('id, name, status, progress, version, team, days, startdate, targetdate, completedon, remarks, description, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     // Apply search filter if provided
@@ -63,8 +63,7 @@ export async function POST(request: NextRequest) {
         targetdate: body.targetdate || null,
         completedon: body.completedon || null,
         remarks: body.remarks || null,
-        description: body.description || null,
-        owner_initials: body.owner_initials || null // Fixed: owner_initials
+        description: body.description || null
       }])
       .select();
 

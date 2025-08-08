@@ -132,8 +132,8 @@ export async function PUT(
     delete updateFields.targetDate;
     delete updateFields.completedOn;
 
-    // If progress is provided but status is not, automatically set status based on progress
-    if (updateData.progress !== undefined && updateData.status === undefined) {
+    // If progress is provided, automatically set status based on progress
+    if (updateData.progress !== undefined) {
       updateFields.status = getStatusFromProgress(updateData.progress);
     }
 
