@@ -5,6 +5,8 @@ import {
   ChevronRight,
   Settings,
   Search,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Product, Component, Feature, TableItem } from "@/app/types";
@@ -103,6 +105,38 @@ export default function ProductTable({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [editingFeatureId, setEditingFeatureId] = useState<string | null>(null);
+  // Add force refresh state
+  const [forceRefresh, setForceRefresh] = useState(0);
+
+  // Column visibility configuration
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    name: true,
+    version: true,
+    status: true,
+    progress: true,
+    team: true,
+    days: true,
+    startDate: true,
+    targetDate: true,
+    completedon: false, // Hidden by default
+    remarks: false, // Hidden by default
+    description: false, // Hidden by default
+  });
+
+  // Available columns configuration
+  const columnConfig = [
+    { key: 'name', label: 'Products, Components, Features', icon: null },
+    { key: 'version', label: 'Version', icon: '/globe.svg' },
+    { key: 'status', label: 'Status', icon: null },
+    { key: 'progress', label: 'Progress', icon: null },
+    { key: 'team', label: 'Team', icon: '/person.svg' },
+    { key: 'days', label: 'Days', icon: '/file_new.svg' },
+    { key: 'startDate', label: 'Start Date', icon: '/clock.svg' },
+    { key: 'targetDate', label: 'Target Date', icon: '/clock.svg' },
+    { key: 'completedon', label: 'Completion Time', icon: '/file_new.svg' },
+    { key: 'remarks', label: 'Remarks', icon: '/file_new.svg' },
+    { key: 'description', label: 'Description', icon: '/file_new.svg' },
+  ];
 
   // In the ProductTable component, add a ref to keep track of expandedItems across refreshes
   const expandedItemsRef = React.useRef(expandedItems);
@@ -111,6 +145,20 @@ export default function ProductTable({
     expandedItemsRef.current = expandedItems;
   }, [expandedItems]);
 
+  // Function to toggle column visibility
+  const toggleColumnVisibility = (columnKey: string) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [columnKey]: !prev[columnKey]
+    }));
+  };
+
+  // Force refresh function
+  const triggerForceRefresh = () => {
+    setForceRefresh(prev => prev + 1);
+    console.log('Force refresh triggered');
+  };
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -118,18 +166,26 @@ export default function ProductTable({
   useEffect(() => {
     filterTableData();
   }, [selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, allTableData]);
+  
   useEffect(() => {
     if (teamFilter.length > 0 || versionFilter.length > 0) {
       recalculateProgress();
     }
   }, [teamFilter, versionFilter]);
+
+  // Force refresh effect
   useEffect(() => {
-    filterTableData();
-  }, [selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, allTableData]);
+    if (forceRefresh > 0) {
+      console.log('Force refresh effect triggered:', forceRefresh);
+      // Trigger a re-render of the table
+      setTableData(prevData => [...prevData]);
+    }
+  }, [forceRefresh]);
 
   
   // Debug: Log tableData changes
   useEffect(() => {
+    console.log('tableData changed:', tableData.length, 'items');
   }, [tableData]);
 
   // Helper to fetch and attach features for expanded components
@@ -238,9 +294,34 @@ export default function ProductTable({
         return 0;
     }
   };
+
+  // Helper function to validate status values
+  const isValidStatus = (status: string | undefined): boolean => {
+    if (!status) return false;
+    const validStatuses = ['Todo', 'In Progress', 'Completed'];
+    return validStatuses.includes(status);
+  };
   // Apply all filters
   async function filterTableData(baseData = allTableData) {
     let filtered = [...baseData];
+    
+    // Sort the data in ascending order by name
+    const sortData = (data: TableItem[]): TableItem[] => {
+      return data.sort((a, b) => {
+        // First sort by type (products, then components, then features)
+        const typeOrder = { 'product': 0, 'component': 1, 'feature': 2 };
+        const typeComparison = typeOrder[a.type] - typeOrder[b.type];
+        if (typeComparison !== 0) return typeComparison;
+        
+        // Then sort by name alphabetically
+        return a.name.localeCompare(b.name);
+      }).map(item => ({
+        ...item,
+        children: item.children ? sortData(item.children) : undefined
+      }));
+    };
+    
+    filtered = sortData(filtered);
     
     // Filter by selected product IDs
     if (selectedProductIds.length > 0) {
@@ -1176,10 +1257,12 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
     if (newExpandedState) {
       if (type === "product") {
         const product = tableData.find((item) => item.id === id);
-        if (!product?.children || product.children.length === 0) {
+        // Only fetch if children haven't been loaded yet (undefined, not empty array)
+        if (!product?.children) {
           // Set loading state
           setLoadingItems(prev => new Set(prev).add(`product-${id}`));
           
+          try {
           const components = await fetchComponents(id);
 
           setTableData((prevData) =>
@@ -1193,13 +1276,16 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               item.id === id ? { ...item, children: components as TableItem[] } : item
             )
           );
-          
+          } catch (error) {
+            console.error('Error fetching components:', error);
+          } finally {
           // Clear loading state
           setLoadingItems(prev => {
             const newSet = new Set(prev);
             newSet.delete(`product-${id}`);
             return newSet;
           });
+          }
         }
       } else if (type === "component") {
         let componentFound = false;
@@ -1214,9 +1300,8 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             if (componentIndex >= 0) {
               componentFound = true;
               productId = product.id;
-              // Check if component already has features loaded
-              componentHasFeatures = !!(product.children[componentIndex].children && 
-                                   product.children[componentIndex].children!.length > 0);
+              // Check if component already has features loaded (children property exists)
+              componentHasFeatures = product.children[componentIndex].children !== undefined;
             }
           }
         });
@@ -1225,6 +1310,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           // Set loading state only if features aren't already loaded
           setLoadingItems(prev => new Set(prev).add(`component-${id}`));
           
+          try {
           const features = await fetchFeatures(id);
 
           setTableData((prevData) =>
@@ -1254,13 +1340,16 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               return product;
             })
           );
-
+          } catch (error) {
+            console.error('Error fetching features:', error);
+          } finally {
           // Remove loading state
           setLoadingItems(prev => {
             const newSet = new Set(prev);
             newSet.delete(`component-${id}`);
             return newSet;
           });
+          }
         }
       }
     }
@@ -1318,7 +1407,8 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
     return children.map((child) => (
       <React.Fragment key={child.id}>
         <TableRow className={`hover:bg-gray-50 ${child.level === 2 ? 'bg-white' : 'bg-blue-50'}`}>
-          <TableCell className="w-[417px] p-2 border-r border-gray-200">
+          {visibleColumns.name && (
+            <TableCell className="w-[417px] p-2 border-r border-gray-200">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${(child.level + 1) * 16}px` }}>
               <div
                 className="flex items-center gap-2 cursor-pointer w-full"
@@ -1425,63 +1515,85 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                 </TooltipProvider>
               )}
             </div>
-          </TableCell>
-          <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-            {child.data.version || "1.0.0"}
-          </TableCell>
-          <TableCell className="w-[130px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              child.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
-              child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-              child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
-            }`}>
-              {child?.data?.status || "-"}
-            </span>
-          </TableCell>
-          <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-            <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
-              <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${getProgressValue(child)}%` }}
-                ></div>
-              </div>
-              <span className="text-xs font-medium">
-                {getProgressValue(child)}%
+            </TableCell>
+          )}
+          {visibleColumns.version && (
+            <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              {child.data.version || "1.0.0"}
+            </TableCell>
+          )}
+          {visibleColumns.status && (
+            <TableCell className="w-[130px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                child.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                isValidStatus(child.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {child?.data?.status || "-"}
               </span>
-            </div>
-          </TableCell>
-          <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {child.data.team || "-"}
-          </TableCell>
-          <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {child.data.days !== undefined ? child.data.days : "-"}
-          </TableCell>
-          <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {(() => {
-              const startDate = child.data.startdate;
-              if (!startDate) return "-";
-              if (typeof startDate === 'string') return startDate;
-              return (startDate as Date).toISOString().split('T')[0];
-            })()}
-          </TableCell>
-          <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {(() => {
-              const endDate = child.data.targetdate;
-              if (!endDate) return "-";
-              if (typeof endDate === 'string') return endDate;
-              return (endDate as Date).toISOString().split('T')[0];
-            })()}
-          </TableCell>
-          <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            {child.data.completedon || "-"}
-          </TableCell>
-          <TableCell className="w-[300px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-            <span className="truncate block">{child.data.remarks || "-"}</span>
-          </TableCell>
-          <TableCell className="w-[300px] text-center text-[14px] text-gray-700">
-            <span className="break-words whitespace-normal text-left">{child.data.description || "-"}</span>
-          </TableCell>
+            </TableCell>
+          )}
+          {visibleColumns.progress && (
+            <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+                <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${getProgressValue(child)}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs font-medium">
+                  {getProgressValue(child)}%
+                </span>
+              </div>
+            </TableCell>
+          )}
+          {visibleColumns.team && (
+            <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {child.data.team || "-"}
+            </TableCell>
+          )}
+          {visibleColumns.days && (
+            <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {child.data.days !== undefined ? child.data.days : "-"}
+            </TableCell>
+          )}
+          {visibleColumns.startDate && (
+            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {(() => {
+                const startDate = child.data.startdate;
+                if (!startDate) return "-";
+                if (typeof startDate === 'string') return startDate;
+                return (startDate as Date).toISOString().split('T')[0];
+              })()}
+            </TableCell>
+          )}
+          {visibleColumns.targetDate && (
+            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {(() => {
+                const endDate = child.data.targetdate;
+                if (!endDate) return "-";
+                if (typeof endDate === 'string') return endDate;
+                return (endDate as Date).toISOString().split('T')[0];
+              })()}
+            </TableCell>
+          )}
+          {visibleColumns.completedon && (
+            <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {child.data.completedon || "-"}
+            </TableCell>
+          )}
+          {visibleColumns.remarks && (
+            <TableCell className="w-[300px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              <span className="truncate block">{child.data.remarks || "-"}</span>
+            </TableCell>
+          )}
+          {visibleColumns.description && (
+            <TableCell className="w-[300px] text-center text-[14px] text-gray-700">
+              <span className="break-words whitespace-normal text-left">{child.data.description || "-"}</span>
+            </TableCell>
+          )}
         </TableRow>
         {/* Recursively render nested children (features under components) */}
         {child.children &&
@@ -1497,9 +1609,10 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   // When a feature is updated, ensure its parent component is expanded
   const handleComponentUpdated = (updatedComponent: Component) => {
     console.log('Updating component in table:', updatedComponent);
-    // Update component in both tableData and allTableData
-    setTableData((prevData) =>
-      prevData.map((item) =>
+    
+    // Force immediate UI update
+    setTableData((prevData) => {
+      const updated = prevData.map((item) =>
         item.type === "product" && item.children
           ? {
               ...item,
@@ -1510,10 +1623,13 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               ),
             }
           : item
-      )
-    );
-    setAllTableData((prevData) =>
-      prevData.map((item) =>
+      );
+      console.log('Updated tableData:', updated);
+      return updated;
+    });
+    
+    setAllTableData((prevData) => {
+      const updated = prevData.map((item) =>
         item.type === "product" && item.children
           ? {
               ...item,
@@ -1524,8 +1640,62 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               ),
             }
           : item
-      )
-    );
+      );
+      console.log('Updated allTableData:', updated);
+      return updated;
+    });
+    
+    // Force a re-render
+    triggerForceRefresh();
+    
+    // Refresh the component's progress by fetching updated component data
+    const refreshComponentProgress = async () => {
+      try {
+        console.log(`Refreshing component progress for component ${updatedComponent.id}`);
+        const response = await fetch(`/api/component/${updatedComponent.id}`);
+        if (response.ok) {
+          const updatedComponentData = await response.json();
+          console.log('Updated component data:', updatedComponentData);
+          
+          // Update the component in the table data
+          setTableData((prevData) => {
+            const updated = prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === updatedComponent.id
+                        ? { ...child, data: updatedComponentData, name: updatedComponentData.name }
+                        : child
+                    ),
+                  }
+                : item
+            );
+            console.log('Component progress updated in tableData:', updated);
+            return updated;
+          });
+          
+          setAllTableData((prevData) => {
+            const updated = prevData.map((item) =>
+              item.type === "product" && item.children
+                ? {
+                    ...item,
+                    children: item.children.map((child) =>
+                      child.id === updatedComponent.id
+                        ? { ...child, data: updatedComponentData, name: updatedComponentData.name }
+                        : child
+                    ),
+                  }
+                : item
+            );
+            console.log('Component progress updated in allTableData:', updated);
+            return updated;
+          });
+        }
+      } catch (error) {
+        console.error('Error refreshing component progress:', error);
+      }
+    };
     
     // Refresh the product's progress by fetching updated product data
     const refreshProductProgress = async () => {
@@ -1536,37 +1706,43 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           const updatedProduct = await response.json();
           console.log('Updated product data:', updatedProduct);
           
-          // Update the product in the table data
-          setTableData((prevData) =>
-            prevData.map((item) =>
+          // Update the product in the table data with force refresh
+          setTableData((prevData) => {
+            const updated = prevData.map((item) =>
               item.type === "product" && item.id === updatedComponent.product_id
                 ? { ...item, data: updatedProduct, name: updatedProduct.name }
                 : item
-            )
-          );
-          setAllTableData((prevData) =>
-            prevData.map((item) =>
+            );
+            console.log('Product progress updated in tableData:', updated);
+            return updated;
+          });
+          
+          setAllTableData((prevData) => {
+            const updated = prevData.map((item) =>
               item.type === "product" && item.id === updatedComponent.product_id
                 ? { ...item, data: updatedProduct, name: updatedProduct.name }
                 : item
-            )
-          );
+            );
+            console.log('Product progress updated in allTableData:', updated);
+            return updated;
+          });
         }
       } catch (error) {
         console.error('Error refreshing product progress:', error);
       }
     };
     
-    // Call the refresh function
+    // Call both refresh functions
+    refreshComponentProgress();
     refreshProductProgress();
   };
 
   const handleFeatureUpdated = (updatedFeature: Feature) => {
     console.log('Updating feature in table:', updatedFeature);
     
-    // Update feature in both tableData and allTableData
-    setTableData((prevData) =>
-      prevData.map((item) =>
+    // Force immediate UI update
+    setTableData((prevData) => {
+      const updated = prevData.map((item) =>
         item.type === "product" && item.children
           ? {
               ...item,
@@ -1584,10 +1760,13 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               ),
             }
           : item
-      )
-    );
-    setAllTableData((prevData) =>
-      prevData.map((item) =>
+      );
+      console.log('Updated tableData with feature:', updated);
+      return updated;
+    });
+    
+    setAllTableData((prevData) => {
+      const updated = prevData.map((item) =>
         item.type === "product" && item.children
           ? {
               ...item,
@@ -1605,8 +1784,13 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               ),
             }
           : item
-      )
-    );
+      );
+      console.log('Updated allTableData with feature:', updated);
+      return updated;
+    });
+    
+    // Force a re-render
+    triggerForceRefresh();
     
     // Refresh the component's progress by fetching updated component data
     const refreshComponentProgress = async () => {
@@ -1617,9 +1801,9 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           const updatedComponent = await response.json();
           console.log('Updated component data:', updatedComponent);
           
-          // Update the component in the table data
-          setTableData((prevData) =>
-            prevData.map((item) =>
+          // Update the component in the table data with force refresh
+          setTableData((prevData) => {
+            const updated = prevData.map((item) =>
               item.type === "product" && item.children
                 ? {
                     ...item,
@@ -1630,10 +1814,13 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     ),
                   }
                 : item
-            )
-          );
-          setAllTableData((prevData) =>
-            prevData.map((item) =>
+            );
+            console.log('Component progress updated in tableData:', updated);
+            return updated;
+          });
+          
+          setAllTableData((prevData) => {
+            const updated = prevData.map((item) =>
               item.type === "product" && item.children
                 ? {
                     ...item,
@@ -1644,8 +1831,10 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     ),
                   }
                 : item
-            )
-          );
+            );
+            console.log('Component progress updated in allTableData:', updated);
+            return updated;
+          });
         }
       } catch (error) {
         console.error('Error refreshing component progress:', error);
@@ -1861,7 +2050,58 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
         return versionData ? versionData.progress : 0;
       }
     }
-    // Otherwise, show normal progress (average of all children)
+    
+    // For products, calculate average progress from components
+    if (item.type === 'product' && item.children && item.children.length > 0) {
+      const componentsWithProgress = item.children.filter(child => 
+        child.type === 'component' && 
+        typeof (child.data as Component).progress === 'number'
+      );
+      
+      if (componentsWithProgress.length > 0) {
+        const totalProgress = componentsWithProgress.reduce((sum, child) => 
+          sum + ((child.data as Component).progress || 0), 0
+        );
+        const averageProgress = Math.round(totalProgress / componentsWithProgress.length);
+        console.log(`Product ${item.name} progress calculation:`, {
+          components: componentsWithProgress.length,
+          totalProgress,
+          averageProgress,
+          componentProgresses: componentsWithProgress.map(c => ({ name: c.name, progress: (c.data as Component).progress }))
+        });
+        return averageProgress;
+      }
+    }
+    
+    // For components, calculate average progress from features
+    if (item.type === 'component' && item.children && item.children.length > 0) {
+      const featuresWithProgress = item.children.filter(child => 
+        child.type === 'feature' && 
+        typeof (child.data as Feature).progress === 'number'
+      );
+      
+      if (featuresWithProgress.length > 0) {
+        const totalProgress = featuresWithProgress.reduce((sum, child) => 
+          sum + ((child.data as Feature).progress || 0), 0
+        );
+        const averageProgress = Math.round(totalProgress / featuresWithProgress.length);
+        console.log(`Component ${item.name} progress calculation from features:`, {
+          features: featuresWithProgress.length,
+          totalProgress,
+          averageProgress,
+          featureProgresses: featuresWithProgress.map(f => ({ name: f.name, progress: (f.data as Feature).progress }))
+        });
+        return averageProgress;
+      }
+    }
+    
+    // For components without features loaded, use stored progress
+    if (item.type === 'component') {
+      console.log(`Component ${item.name} using stored progress:`, item.data.progress);
+      return item.data.progress || 0;
+    }
+    
+    // Fallback to stored progress
     return item.data.progress || 0;
   };
 
@@ -2018,6 +2258,35 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                   className="pl-10 w-64 h-9"
                 />
               </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-1">
+                    <Eye className="h-4 w-4" />
+                    Show Columns
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 bg-white">
+                  <div className="px-2 py-1.5 text-sm font-semibold text-gray-700">
+                    Column Visibility
+                  </div>
+                  <DropdownMenuSeparator />
+                  {columnConfig.map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.key}
+                      checked={visibleColumns[column.key]}
+                      onCheckedChange={() => toggleColumnVisibility(column.key)}
+                      className="flex items-center gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        {column.icon && (
+                          <img className="w-4 h-4" src={column.icon} alt={column.label} />
+                        )}
+                        <span>{column.label}</span>
+                      </div>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu >
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-9 gap-1">
@@ -2044,74 +2313,97 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
         </div>
         {/* Table Container */}
         <div className="bg-white">
-          <Table className="w-full">
+          <Table key={`table-${forceRefresh}`} className="w-full">
             <TableHeader>
               <TableRow className="bg-gray-50 hover:bg-gray-50 border-b border-gray-200">
-                <TableHead className="w-[417px] text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  Products, Components, Features
-                </TableHead>
-                <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/globe.svg" alt="Version" />
-                    Version
-                  </div>
-                </TableHead>
-                <TableHead className="w-[130px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  Status
-                </TableHead>
-                <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  Progress
-                </TableHead>
-                <TableHead className="w-[144px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/person.svg" alt="Team" />
-                    Team
-                  </div>
-                </TableHead>
-                <TableHead className="w-[112px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/file_new.svg" alt="Days" />
-                    Days
-                  </div>
-                </TableHead>
-                <TableHead className="w-[170px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/clock.svg" alt="Start Date" />
-                    Start Date
-                  </div>
-                </TableHead>
-                <TableHead className="w-[180px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/clock.svg" alt="Target Date" />
-                    Target Date
-                  </div>
-                </TableHead>
-                <TableHead className="w-[190px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/file_new.svg" alt="Completion Time" />
-                    Completion Time
-                  </div>
-                </TableHead>
-                <TableHead className="w-[300px] text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/file_new.svg" alt="Remarks" />
-                    Remarks
-                  </div>
-                </TableHead>
-                <TableHead className="w-[300px] text-[13px] font-bold text-gray-700">
-                  <div className="flex items-center justify-center gap-1">
-                    <img className="w-4 h-4" src="/file_new.svg" alt="Description" />
-                    Description
-                  </div>
-                </TableHead>
+                {visibleColumns.name && (
+                  <TableHead className="w-[417px] text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    Products, Components, Features
+                  </TableHead>
+                )}
+                {visibleColumns.version && (
+                  <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/globe.svg" alt="Version" />
+                      Version
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.status && (
+                  <TableHead className="w-[130px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    Status
+                  </TableHead>
+                )}
+                {visibleColumns.progress && (
+                  <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    Progress
+                  </TableHead>
+                )}
+                {visibleColumns.team && (
+                  <TableHead className="w-[144px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/person.svg" alt="Team" />
+                      Team
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.days && (
+                  <TableHead className="w-[112px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/file_new.svg" alt="Days" />
+                      Days
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.startDate && (
+                  <TableHead className="w-[170px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/clock.svg" alt="Start Date" />
+                      Start Date
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.targetDate && (
+                  <TableHead className="w-[180px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/clock.svg" alt="Target Date" />
+                      Target Date
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.completedon && (
+                  <TableHead className="w-[190px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/file_new.svg" alt="Completion Time" />
+                      Completion Time
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.remarks && (
+                  <TableHead className="w-[300px] text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/file_new.svg" alt="Remarks" />
+                      Remarks
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.description && (
+                  <TableHead className="w-[300px] text-[13px] font-bold text-gray-700">
+                    <div className="flex items-center justify-center gap-1">
+                      <img className="w-4 h-4" src="/file_new.svg" alt="Description" />
+                      Description
+                    </div>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
 
-            <TableBody>
+            <TableBody key={`tbody-${forceRefresh}`}>
               {tableData.map((item) => (
                 <React.Fragment key={item.id}>
                   <TableRow className={`hover:bg-gray-50 ${selectedProduct?.id === item.id ? "bg-blue-50" : ""}`}>
-                    <TableCell className="w-[417px] p-2 border-r border-gray-200">
+                    {visibleColumns.name && (
+                      <TableCell className="w-[417px] p-2 border-r border-gray-200">
                       <div className="flex items-center gap-2" style={{ paddingLeft: `${item.level * 16}px` }}>
                         <div
                           className="flex items-center gap-2 cursor-pointer w-full"
@@ -2191,63 +2483,85 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                           </div>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {item.data.version || "1.0.0"}
-                    </TableCell>
-                    <TableCell className="w-[130px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        item.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                        item.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                        item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {item.data.status || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-                      <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
-                        <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${getProgressValue(item)}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs font-medium">
-                          {getProgressValue(item)}%
+                      </TableCell>
+                    )}
+                    {visibleColumns.version && (
+                      <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.data.version || "1.0.0"}
+                      </TableCell>
+                    )}
+                    {visibleColumns.status && (
+                      <TableCell className="w-[130px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          item.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                          item.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                          item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                          isValidStatus(item.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.data.status || "-"}
                         </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {item.data.team || "-"}
-                    </TableCell>
-                    <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {item.data.days !== undefined ? item.data.days : "-"}
-                    </TableCell>
-                    <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {(() => {
-                        const startDate = item.data.startdate;
-                        if (!startDate) return "-";
-                        if (typeof startDate === 'string') return startDate;
-                        return (startDate as Date).toISOString().split('T')[0];
-                      })()}
-                    </TableCell>
-                    <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {(() => {
-                        const endDate = item.data.targetdate;
-                        if (!endDate) return "-";
-                        if (typeof endDate === 'string') return endDate;
-                        return (endDate as Date).toISOString().split('T')[0];
-                      })()}
-                    </TableCell>
-                    <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      {item.data.completedon || "-"}
-                    </TableCell>
-                    <TableCell className="w-[300px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                      <span className="truncate block">{item.data.remarks || "-"}</span>
-                    </TableCell>
-                    <TableCell className="w-[300px] text-center text-[14px] text-gray-700">
-                      <span className="break-words whitespace-normal text-left">{item.data.description || "-"}</span>
-                    </TableCell>
+                      </TableCell>
+                    )}
+                    {visibleColumns.progress && (
+                      <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+                        <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
+                          <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${getProgressValue(item)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-medium">
+                            {getProgressValue(item)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
+                    {visibleColumns.team && (
+                      <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.data.team || "-"}
+                      </TableCell>
+                    )}
+                    {visibleColumns.days && (
+                      <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.data.days !== undefined ? item.data.days : "-"}
+                      </TableCell>
+                    )}
+                    {visibleColumns.startDate && (
+                      <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {(() => {
+                          const startDate = item.data.startdate;
+                          if (!startDate) return "-";
+                          if (typeof startDate === 'string') return startDate;
+                          return (startDate as Date).toISOString().split('T')[0];
+                        })()}
+                      </TableCell>
+                    )}
+                    {visibleColumns.targetDate && (
+                      <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {(() => {
+                          const endDate = item.data.targetdate;
+                          if (!endDate) return "-";
+                          if (typeof endDate === 'string') return endDate;
+                          return (endDate as Date).toISOString().split('T')[0];
+                        })()}
+                      </TableCell>
+                    )}
+                    {visibleColumns.completedon && (
+                      <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.data.completedon || "-"}
+                      </TableCell>
+                    )}
+                    {visibleColumns.remarks && (
+                      <TableCell className="w-[300px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        <span className="truncate block">{item.data.remarks || "-"}</span>
+                      </TableCell>
+                    )}
+                    {visibleColumns.description && (
+                      <TableCell className="w-[300px] text-center text-[14px] text-gray-700">
+                        <span className="break-words whitespace-normal text-left">{item.data.description || "-"}</span>
+                      </TableCell>
+                    )}
                   </TableRow>
                   {item.children &&
                     isExpanded(item.type, item.id) &&

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { fetchExistingTeamMembers, teamEventEmitter, addTeamMemberToCache } from '@/utils/teamUtils';
 
 interface TeamFilterProps {
   selectedTeams: string[];
@@ -20,6 +21,28 @@ interface TeamFilterProps {
 
 export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: TeamFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [localTeams, setLocalTeams] = useState<string[]>(availableTeams);
+  const [newTeamName, setNewTeamName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Update local teams when availableTeams prop changes
+  useEffect(() => {
+    setLocalTeams(availableTeams);
+  }, [availableTeams]);
+
+  // Listen for team member updates
+  useEffect(() => {
+    const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
+      setLocalTeams(prev => {
+        if (!prev.includes(teamName)) {
+          return [...prev, teamName];
+        }
+        return prev;
+      });
+    });
+
+    return unsubscribe;
+  }, []);
 
   const handleTeamToggle = (team: string) => {
     const updatedTeams = selectedTeams.includes(team) 
@@ -28,6 +51,47 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
 
     onTeamSelect(updatedTeams);
   };
+
+  const handleAddNewTeam = () => {
+    if (newTeamName.trim()) {
+      const trimmedName = newTeamName.trim();
+      
+      // Add to cache immediately for real-time updates
+      addTeamMemberToCache(trimmedName);
+      
+      // Update local teams list
+      setLocalTeams(prev => {
+        if (!prev.includes(trimmedName)) {
+          return [...prev, trimmedName];
+        }
+        return prev;
+      });
+      
+      // Add to selected teams
+      if (!selectedTeams.includes(trimmedName)) {
+        onTeamSelect([...selectedTeams, trimmedName]);
+      }
+      
+      setNewTeamName('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddNewTeam();
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+      setNewTeamName('');
+    }
+  };
+
+  // Focus input when dropdown opens
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -44,7 +108,7 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
         </DropdownMenuLabel>
         
         <div className="max-h-48 overflow-y-auto">
-          {availableTeams.map((team) => (
+          {localTeams.map((team) => (
             <DropdownMenuCheckboxItem
               key={team}
               checked={selectedTeams.includes(team)}
@@ -59,7 +123,7 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
           ))}
           
           {selectedTeams.map(team => 
-            !availableTeams.includes(team) && (
+            !localTeams.includes(team) && (
               <DropdownMenuCheckboxItem
                 key={team}
                 checked={true}
@@ -73,6 +137,31 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
               </DropdownMenuCheckboxItem>
             )
           )}
+        </div>
+
+        {/* Add New Team Member */}
+        <div className="p-2 border-t border-gray-200">
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type to add new team member"
+              className="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {newTeamName.trim() && (
+              <button
+                type="button"
+                onClick={handleAddNewTeam}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                title={`Add "${newTeamName.trim()}"`}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

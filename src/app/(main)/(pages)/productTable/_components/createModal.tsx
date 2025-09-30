@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { TeamDropdown } from '@/components/ui/team-dropdown';
 import { Component } from '@/app/types/index';
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -27,6 +28,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
     status: 'Todo',
     progress: 0,
     version: '1.0.0',
+    team: '', // Added team field
     description: '',
   });
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
             status: data.status || 'Todo',
             progress: data.progress || 0,
             version: data.version || '1.0.0',
+            team: data.team || '', // Fetch team
             description: data.description || '',
           });
         })
@@ -53,6 +56,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
         status: 'Todo',
         progress: 0,
         version: '1.0.0',
+        team: '', // Reset team
         description: '',
       });
     }
@@ -120,6 +124,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
           status: 'Todo',
           progress: 0,
           version: '1.0.0',
+          team: '', // Reset team
           description: '',
         });
       }
@@ -197,6 +202,17 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 value={formData.version || ''}
                 onChange={handleChange}
                 placeholder="e.g., 1.0.0"
+                className="mt-1"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="team">Team</Label>
+              <TeamDropdown
+                value={formData.team || ""}
+                onChange={(value) => setFormData(prev => ({ ...prev, team: value }))}
+                placeholder="Select or add team member"
                 className="mt-1"
                 disabled={loading}
               />

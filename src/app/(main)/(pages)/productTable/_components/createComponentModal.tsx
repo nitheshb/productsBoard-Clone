@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { TeamDropdown } from "@/components/ui/team-dropdown";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -41,6 +42,7 @@ export function CreateComponentModal({
     progress: 0,
     version: "1.0.0",
     status: "Todo", // Added status field
+    team: "", // Added team field
     product_id: productId,
     startDate: null,
     targetDate: null,
@@ -78,6 +80,7 @@ export function CreateComponentModal({
             progress: data.progress || 0,
             version: data.version || "1.0.0",
             status: data.status || "Todo", // Fetch status
+            team: data.team || "", // Fetch team
             product_id: data.product_id || productId,
             startDate: data.startDate || null,
             targetDate: data.targetDate || null,
@@ -92,6 +95,7 @@ export function CreateComponentModal({
         progress: 0,
         version: "1.0.0",
         status: "Todo", // Default status for new component
+        team: "", // Default team for new component
         product_id: productId,
         startDate: null,
         targetDate: null,
@@ -183,6 +187,7 @@ export function CreateComponentModal({
           progress: 0,
           version: "1.0.0",
           status: "Todo", // Reset status
+          team: "", // Reset team
           product_id: formData.product_id,
           startDate: null,
           targetDate: null,
@@ -203,6 +208,7 @@ export function CreateComponentModal({
       progress: 0,
       version: "1.0.0",
       status: "Todo", // Reset status
+      team: "", // Reset team
       product_id: productId,
       startDate: null,
       targetDate: null,
@@ -276,7 +282,6 @@ export function CreateComponentModal({
                   <option value="Todo">Todo</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
-                  <option value="Blocked">Blocked</option>
                 </select>
               </div>
             </div>
@@ -306,6 +311,20 @@ export function CreateComponentModal({
                   value={formData.version}
                   onChange={handleChange}
                   placeholder="e.g., 1.0.0"
+                  className="w-full"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Team */}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 w-24">Team</span>
+              <div className="relative w-full">
+                <TeamDropdown
+                  value={formData.team || ""}
+                  onChange={(value) => setFormData(prev => ({ ...prev, team: value }))}
+                  placeholder="Select or add team member"
                   className="w-full"
                   disabled={loading}
                 />

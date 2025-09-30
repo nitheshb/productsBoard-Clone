@@ -85,6 +85,13 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
     // Calculate average progress from actual progress values
     const total = features.reduce((sum, feature) => sum + (feature.progress || 0), 0);
     const average = Math.round(total / features.length);
+    
+    console.log(`Component ${componentId} progress calculation:`, {
+      features: features.length,
+      totalProgress: total,
+      averageProgress: average,
+      featureProgresses: features.map(f => ({ progress: f.progress, status: f.status }))
+    });
 
     // Determine status based on features' status
     const featureStatuses = features.map(feature => feature.status || 'Todo');

@@ -4,6 +4,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
+// Helper function to validate status values
+const isValidStatus = (status: string | undefined): boolean => {
+  if (!status) return false;
+  const validStatuses = ['Todo', 'In Progress', 'Completed'];
+  return validStatuses.includes(status);
+};
+
+// Helper function to determine status based on progress
+const getStatusFromProgress = (progress: number): string => {
+  if (progress === 0) {
+    return 'Todo';
+  } else if (progress === 100) {
+    return 'Completed';
+  } else {
+    return 'In Progress';
+  }
+};
+
 // Get a single product with its components and features
 export async function GET(
   request: NextRequest,
@@ -82,6 +100,7 @@ export async function PUT(
     }
 
     const body = await request.json();
+    console.log('Product update request:', { id, body });
 
     // Check if product exists
     const { data: existingProduct, error: checkError } = await supabase
@@ -119,21 +138,23 @@ export async function PUT(
     if (body.remarks !== undefined) updateFields.remarks = body.remarks;
     if (body.description !== undefined) updateFields.description = body.description;
 
-    // Helper function to determine status based on progress
-    const getStatusFromProgress = (progress: number): string => {
-      if (progress === 0) {
-        return 'Todo';
-      } else if (progress === 100) {
-        return 'Completed';
-      } else {
-        return 'In Progress';
-      }
-    };
+    // Validate status if provided
+    if (body.status && !isValidStatus(body.status)) {
+      return NextResponse.json({ 
+        error: 'Invalid status value. Must be one of: Todo, In Progress, Completed' 
+      }, { status: 400 });
+    }
 
     // If progress is provided, automatically set status based on progress
-    if (body.progress !== undefined) {
+    // But only if status is not explicitly provided
+    if (body.progress !== undefined && body.status === undefined) {
       updateFields.status = getStatusFromProgress(body.progress);
+      console.log(`Auto-setting status to ${updateFields.status} based on progress ${body.progress}`);
+    } else if (body.status !== undefined) {
+      console.log(`Using explicit status: ${body.status}`);
     }
+
+    console.log('Updating product with fields:', updateFields);
 
     const { data, error } = await supabase
       .from('products')
@@ -150,6 +171,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Product not found after update' }, { status: 404 });
     }
 
+    console.log('Product updated successfully:', data[0]);
     return NextResponse.json(data[0]);
   } catch (error) {
     console.error('Error in PUT /api/product/[id]:', error);

@@ -1,10 +1,24 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 
 const Sidebar = () => {
   const [activeItem, setActiveItem] = useState('products');
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Update active item based on current route
+  useEffect(() => {
+    if (pathname === '/employees') {
+      setActiveItem('employees');
+    } else if (pathname === '/product') {
+      setActiveItem('products');
+    } else if (pathname === '/') {
+      setActiveItem('products'); // Default to products instead of home
+    }
+  }, [pathname]);
   
   const menuItems = [
     {
@@ -40,6 +54,18 @@ const Sidebar = () => {
       label: 'Portals',
       icon: (
         <svg height="16px" width="16px" viewBox="0 0 16 16" role="img" aria-label="PortalIcon" className="sc-fQpRED bUGbIN ui-icon"><path fill="currentColor" fillRule="evenodd" d="M8 2.083a5.917 5.917 0 1 0 0 11.834A5.917 5.917 0 0 0 8 2.083M.583 8a7.417 7.417 0 1 1 14.834 0A7.417 7.417 0 0 1 .583 8m9.058-1.64-2.461.82-.82 2.46 2.46-.82zm.382-1.697c.125-.03.373-.078.64.017.307.11.548.35.657.656.096.268.046.516.017.64-.03.13-.08.28-.128.423l-.008.023-.992 2.976-.005.017c-.021.065-.07.214-.16.346q-.116.168-.282.283a1.4 1.4 0 0 1-.364.165l-2.975.992-.024.008a5 5 0 0 1-.422.128c-.125.03-.373.078-.64-.017a1.08 1.08 0 0 1-.657-.656 1.1 1.1 0 0 1-.017-.64c.03-.13.081-.281.128-.423l.008-.023.992-2.976.006-.017c.02-.065.069-.214.16-.346q.113-.168.282-.283c.132-.09.281-.139.346-.16l.018-.005 2.975-.992.023-.008a5 5 0 0 1 .422-.128" clipRule="evenodd"></path></svg>
+      )
+    },
+    {
+      id: 'employees',
+      label: 'Employees',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
       )
     },
     {
@@ -83,7 +109,23 @@ const Sidebar = () => {
               className={`flex flex-col items-center py-3 cursor-pointer relative ${
                 activeItem === item.id ? 'text-blue-500' : 'text-black'
               } hover:bg-gray-100`}
-              onClick={() => setActiveItem(item.id)}
+              onClick={() => {
+                if (item.id === 'employees') {
+                  setActiveItem(item.id);
+                  router.push('/employees');
+                } else if (item.id === 'products') {
+                  setActiveItem(item.id);
+                  router.push('/product');
+                } else if (item.id === 'home') {
+                  alert('Coming Soon: Home Dashboard');
+                } else if (item.id === 'search') {
+                  alert('Coming Soon: Search Feature');
+                } else if (item.id === 'insights') {
+                  alert('Coming Soon: Analytics & Insights');
+                } else if (item.id === 'portals') {
+                  alert('Coming Soon: Portals Management');
+                }
+              }}
             >
               <div className="mb-1">{item.icon}</div>
               <span className="text-xs">{item.label}</span>

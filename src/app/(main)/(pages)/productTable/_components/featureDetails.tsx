@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Feature } from "@/app/types"; // Assuming this type exists
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { TeamDropdown } from "@/components/ui/team-dropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -160,7 +161,6 @@ function DetailsTabContent({
               <option value="Todo">Todo</option>
               <option value="In Progress">In Progress</option>
               <option value="Completed">Completed</option>
-              <option value="Blocked">Blocked</option>
             </select>
           ) : (
             <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('status')}>{draftFeature.status || feature.status || 'Not assigned'}</span>
@@ -213,14 +213,12 @@ function DetailsTabContent({
         </div>
         <div className="flex-1">
           {editingField === 'team' ? (
-            <Input
-              ref={editInputRef}
-              type="text"
+            <TeamDropdown
               value={draftFeature?.team ?? ''}
-              onChange={e => handleInputChange('team', e.target.value)}
-              onBlur={() => handleInputBlur('team')}
-              onKeyDown={e => handleInputKeyPress(e, 'team')}
-              className="w-full text-sm h-9"
+              onChange={(value) => handleInputChange('team', value)}
+              placeholder="Update team member"
+              className="w-full"
+              disabled={saving}
             />
           ) : (
             <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('team')}>{feature?.team ?? 'Not assigned'}</span>

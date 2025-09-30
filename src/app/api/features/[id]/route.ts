@@ -14,6 +14,13 @@ const getStatusFromProgress = (progress: number): string => {
   }
 };
 
+// Helper function to validate status values
+const isValidStatus = (status: string | undefined): boolean => {
+  if (!status) return false;
+  const validStatuses = ['Todo', 'In Progress', 'Completed'];
+  return validStatuses.includes(status);
+};
+
 
 
 // Get a single feature
@@ -68,6 +75,13 @@ export async function PUT(
       throw checkError;
     }
 
+    // Validate status if provided
+    if (body.status && !isValidStatus(body.status)) {
+      return NextResponse.json({ 
+        error: 'Invalid status value. Must be one of: Todo, In Progress, Completed' 
+      }, { status: 400 });
+    }
+
     // Always update all fields, setting to null if not present in the body
     const updateFields: any = {
       name: body.name ?? null,
@@ -92,7 +106,8 @@ export async function PUT(
     });
 
     // If progress is provided, automatically set status based on progress
-    if (body.progress !== undefined) {
+    // But only if status is not explicitly provided
+    if (body.progress !== undefined && body.status === undefined) {
       updateFields.status = getStatusFromProgress(body.progress);
     }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { TeamDropdown } from "@/components/ui/team-dropdown";
 import React from "react"; // Added missing import
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -278,13 +279,12 @@ export function CreateFeatureModal({
       {/* Team */}
       <div className="flex items-center gap-1">
         <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Team</span>
-        <Input
-          id="team"
-          name="team"
+        <TeamDropdown
           value={formData.team || ""}
-          onChange={handleChange}
-          className="w-full h-[32px] bg-white border border-gray-300 focus:border-blue-500 focus:outline-none"
-          placeholder="Assign team"
+          onChange={(value) => setFormData(prev => ({ ...prev, team: value }))}
+          placeholder="Select or add team member"
+          className="w-full"
+          disabled={loading}
         />
       </div>
 

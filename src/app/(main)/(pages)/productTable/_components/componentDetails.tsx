@@ -8,6 +8,7 @@ import { Trash2, MoreVertical, Loader2, Pencil, Flag, Gauge, Users, Timer, Calen
 import { Component as ComponentType, Feature } from '@/app/types'; // Assuming these types exist
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { TeamDropdown } from '@/components/ui/team-dropdown';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from "@/app/hooks/use-toast";
 import { toast } from "sonner";
@@ -107,7 +108,6 @@ function DetailsTabContent({
               <option value="Todo">Todo</option>
               <option value="In Progress">In Progress</option>
               <option value="Completed">Completed</option>
-              <option value="Blocked">Blocked</option>
             </select>
           ) : (
             <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('status')}>{draftComponent.status || component.status || 'Not assigned'}</span>
@@ -161,14 +161,12 @@ function DetailsTabContent({
         </div>
         <div className="flex-1">
           {editingField === 'team' ? (
-            <Input
-              ref={editInputRef}
-              type="text"
+            <TeamDropdown
               value={draftComponent?.team ?? ''}
-              onChange={e => handleInputChange('team', e.target.value)}
-              onBlur={() => handleInputBlur('team')}
-              onKeyDown={e => handleInputKeyPress(e, 'team')}
-              className="w-full text-sm h-9"
+              onChange={(value) => handleInputChange('team', value)}
+              placeholder="Udpate team member"
+              className="w-full"
+              disabled={saving}
             />
           ) : (
             <span className="block text-gray-800 min-h-[28px] text-sm cursor-pointer" onClick={() => setEditingField('team')}>{component?.team ?? 'Not assigned'}</span>
@@ -472,22 +470,27 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
     if (!draftComponent || !componentId) return;
     setSaving(true);
     try {
+      const requestData = {
+        ...draftComponent,
+        startDate: draftComponent.startdate,
+        targetDate: draftComponent.targetdate,
+        completedOn: draftComponent.completedon,
+        updateProductProgress: true,
+      };
+      
+      console.log('Sending component update:', requestData);
+      
       const response = await fetch(`/api/component/${componentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...draftComponent,
-          startDate: draftComponent.startdate,
-          targetDate: draftComponent.targetdate,
-          completedOn: draftComponent.completedon,
-          updateProductProgress: true,
-        }),
+        body: JSON.stringify(requestData),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData?.error || `Failed to update component`);
       }
       const data: ComponentType = await response.json();
+      console.log('Received component update response:', data);
       setComponent(data);
       setDraftComponent(data);
       

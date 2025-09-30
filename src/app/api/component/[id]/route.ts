@@ -16,6 +16,13 @@ const getStatusFromProgress = (progress: number): string => {
   }
 };
 
+// Helper function to validate status values
+const isValidStatus = (status: string | undefined): boolean => {
+  if (!status) return false;
+  const validStatuses = ['Todo', 'In Progress', 'Completed'];
+  return validStatuses.includes(status);
+};
+
 // Get a single component with its features
 export async function GET(
   request: NextRequest,
@@ -100,6 +107,13 @@ export async function PUT(
     const updateData = { ...body };
     delete updateData.updateProductProgress;
 
+    // Validate status if provided
+    if (updateData.status && !isValidStatus(updateData.status)) {
+      return NextResponse.json({ 
+        error: 'Invalid status value. Must be one of: Todo, In Progress, Completed' 
+      }, { status: 400 });
+    }
+
     // Always update all fields, setting to null if not present in the body
     const updateFields: any = {
       name: updateData.name ?? null,
@@ -133,10 +147,16 @@ export async function PUT(
     delete updateFields.completedOn;
 
     // If progress is provided, automatically set status based on progress
-    if (updateData.progress !== undefined) {
+    // But only if status is not explicitly provided
+    if (updateData.progress !== undefined && updateData.status === undefined) {
       updateFields.status = getStatusFromProgress(updateData.progress);
+      console.log(`Auto-setting status to ${updateFields.status} based on progress ${updateData.progress}`);
+    } else if (updateData.status !== undefined) {
+      console.log(`Using explicit status: ${updateData.status}`);
     }
 
+    console.log('Updating component with fields:', updateFields);
+    
     const { data, error } = await supabase
       .from('components')
       .update(updateFields)
@@ -144,11 +164,15 @@ export async function PUT(
       .select();
 
     if (error) throw error;
+    
+    console.log('Component updated successfully:', data[0]);
 
     // Update product progress and version progress if flag is true
     if (shouldUpdateProductProgress && existingComponent?.product_id) {
       try {
-        await updateProductProgressWithParents(existingComponent.product_id);
+        console.log(`Updating product progress for product ${existingComponent.product_id} after component update`);
+        const updatedProgress = await updateProductProgressWithParents(existingComponent.product_id);
+        console.log(`Product progress updated to: ${updatedProgress}%`);
       } catch (progressError) {
         console.error('Error updating product progress:', progressError);
         // Don't fail the component update if progress update fails

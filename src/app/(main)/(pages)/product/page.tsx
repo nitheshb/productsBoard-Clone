@@ -7,6 +7,7 @@ import ProductDropdown from '@/app/(main)/(pages)/productDropdown/ProductDropdow
 import Sidebar from './_components/sidebar';
 import { supabase } from '@/lib/supabaseClient';
 import { FilterContainer } from '@/components/filters/filtercontainer';
+import { fetchExistingTeamMembers, teamEventEmitter } from '@/utils/teamUtils';
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -30,16 +31,9 @@ export default function Home() {
         async function fetchFilterOptions() {
             setIsLoading(true);
             try {
-                // Fetch unique team values from database
-                const { data: teamData, error: teamError } = await supabase
-                    .from('features')
-                    .select('team')
-                    .not('team', 'is', null);
-                
-                if (teamError) throw teamError;
-
-                const teams = new Set(teamData.map(item => item.team).filter(Boolean));
-                setAvailableTeams(Array.from(teams) as string[]);
+                // Fetch team members using the real-time system
+                const teamMembers = await fetchExistingTeamMembers();
+                setAvailableTeams(teamMembers.map(member => member.name));
                 
                 // Fetch unique status values from database
                 const { data: statusData, error: statusError } = await supabase
@@ -70,6 +64,20 @@ export default function Home() {
         }
         
         fetchFilterOptions();
+    }, []);
+
+    // Listen for team member updates
+    useEffect(() => {
+        const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
+            setAvailableTeams(prev => {
+                if (!prev.includes(teamName)) {
+                    return [...prev, teamName];
+                }
+                return prev;
+            });
+        });
+
+        return unsubscribe;
     }, []);
 
     const handleProductsSelect = (productIds: string[]) => {
