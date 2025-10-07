@@ -45,9 +45,10 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
   }, []);
 
   const handleTeamToggle = (team: string) => {
+    // For single selection: if the team is already selected, deselect it; otherwise, select only this team
     const updatedTeams = selectedTeams.includes(team) 
-      ? selectedTeams.filter((t) => t !== team)
-      : [...selectedTeams, team];
+      ? [] // Deselect if already selected
+      : [team]; // Select only this team (single selection)
 
     onTeamSelect(updatedTeams);
   };
@@ -96,9 +97,11 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1 bg-white hover:bg-gray-50 border-gray-300">
+        <Button variant="outline" size="sm" className="h-8 gap-1 bg-white hover:bg-gray-50 border-gray-300 w-full min-w-[120px] max-w-[140px]">
           <Users className="h-4 w-4" />
-          Team {selectedTeams.length > 0 && `(${selectedTeams.length})`}
+          <span className="truncate">
+            {selectedTeams.length > 0 ? selectedTeams[0] : "Select Team"}
+          </span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

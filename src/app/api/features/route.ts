@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
         completedon: featureData.completedon || null,
         remarks: featureData.remarks || null,
         description: featureData.description || null,
-        version: featureData.version || '1.0.0'
+        version: featureData.version || '1.0.0',
+        task_type: featureData.task_type || null
       }])
       .select();
 
