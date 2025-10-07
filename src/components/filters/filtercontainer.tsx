@@ -5,20 +5,24 @@ import { Badge } from "@/components/ui/badge";
 import { TeamFilter } from './TeamFilter';
 import { StatusFilter } from './StatusFilter';
 import { VersionFilter } from './VersionFilter';
+import { TaskTypeFilter } from './TaskTypeFilter';
 import { DateFilter } from './DateFilter';
 
 interface FilterContainerProps {
   selectedTeams: string[];
   selectedStatuses: string[];
   selectedVersions: string[];
+  selectedTaskTypes: string[];
   startDate: Date | undefined;
   endDate: Date | undefined;
   availableTeams: string[];
   availableStatuses: string[];
   availableVersions: string[];
+  availableTaskTypes: string[];
   onTeamSelect: (teams: string[]) => void;
   onStatusSelect: (statuses: string[]) => void;
   onVersionSelect: (versions: string[]) => void;
+  onTaskTypeSelect: (taskTypes: string[]) => void;
   onDateChange: (start: Date | undefined, end: Date | undefined) => void;
   onClearFilters: () => void;
 }
@@ -27,20 +31,24 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
   selectedTeams,
   selectedStatuses,
   selectedVersions,
+  selectedTaskTypes,
   startDate,
   endDate,
   availableTeams,
   availableStatuses,
   availableVersions,
+  availableTaskTypes,
   onTeamSelect,
   onStatusSelect,
   onVersionSelect,
+  onTaskTypeSelect,
   onDateChange,
   onClearFilters,
 }) => {
   const hasActiveFilters = selectedTeams.length > 0 || 
                           selectedStatuses.length > 0 || 
                           selectedVersions.length > 0 || 
+                          selectedTaskTypes.length > 0 ||
                           startDate || 
                           endDate;
 
@@ -69,6 +77,12 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
           startDate={startDate}
           endDate={endDate}
           onDateSelect={onDateChange}
+        />
+
+        <TaskTypeFilter
+          selectedTaskTypes={selectedTaskTypes}
+          availableTaskTypes={availableTaskTypes}
+          onTaskTypeSelect={onTaskTypeSelect}
         />
 
         {hasActiveFilters && (
@@ -126,6 +140,20 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
               </button>
             </Badge>
           ))}
+
+          {selectedTaskTypes.map(taskType => (
+            <Badge key={taskType} variant="secondary" className="text-xs bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
+              <span className="mr-1">🏷️</span>
+              {taskType}
+              <button 
+                onClick={() => onTaskTypeSelect(selectedTaskTypes.filter(t => t !== taskType))}
+                className="ml-1 rounded-full hover:bg-indigo-300 h-4 w-4 flex items-center justify-center transition-colors"
+              >
+                ×
+              </button>
+            </Badge>
+          ))}
+
           
           {(startDate || endDate) && (
             <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 hover:bg-orange-200">

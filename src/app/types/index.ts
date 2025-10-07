@@ -62,6 +62,30 @@ export interface Feature {
   version_progress?: VersionProgress[];
   created_at: string;
   updated_at?: string;
+  task_type?: string; // New field for task type (dev, testing, ux, etc.)
+}
+
+// New interface for multi-task creation
+export interface MultiTaskItem {
+  task_type: string;
+  name: string;
+  status: string;
+  progress: number;
+  team: string;
+  days: number | null;
+  startdate: string | null;
+  targetdate: string | null;
+  completedon: string | null;
+  remarks: string;
+  description: string;
+  version: string;
+}
+
+export interface TaskType {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
 }
 
 

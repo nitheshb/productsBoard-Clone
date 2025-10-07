@@ -17,6 +17,7 @@ export default function Home() {
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+    const [selectedTaskTypes, setSelectedTaskTypes] = useState<string[]>([]);
     const [startDate, setStartDate] = useState<Date | undefined>(undefined);
     const [endDate, setEndDate] = useState<Date | undefined>(undefined);
     
@@ -24,6 +25,7 @@ export default function Home() {
     const [availableTeams, setAvailableTeams] = useState<string[]>([]);
     const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
     const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+    const [availableTaskTypes, setAvailableTaskTypes] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Fetch filter options from database
@@ -56,6 +58,11 @@ export default function Home() {
 
                 const versions = versionData.map(item => item.version);
                 setAvailableVersions(versions);
+
+                // Use predefined task types from create form - only main categories
+                const mainTaskTypes = ['Development', 'Testing'];
+                
+                setAvailableTaskTypes(mainTaskTypes);
             } catch (error) {
                 console.error("Error fetching filter options:", error);
             } finally {
@@ -96,6 +103,10 @@ export default function Home() {
         setSelectedVersions(versions);
     };
 
+    const handleTaskTypeSelect = (taskTypes: string[]) => {
+        setSelectedTaskTypes(taskTypes);
+    };
+
     const handleDateChange = (start: Date | undefined, end: Date | undefined) => {
         setStartDate(start);
         setEndDate(end);
@@ -105,6 +116,7 @@ export default function Home() {
         setSelectedTeams([]);
         setSelectedStatuses([]);
         setSelectedVersions([]);
+        setSelectedTaskTypes([]);
         setStartDate(undefined);
         setEndDate(undefined);
     };
@@ -130,14 +142,17 @@ export default function Home() {
                             selectedTeams={selectedTeams}
                             selectedStatuses={selectedStatuses}
                             selectedVersions={selectedVersions}
+                            selectedTaskTypes={selectedTaskTypes}
                             startDate={startDate}
                             endDate={endDate}
                             availableTeams={availableTeams}
                             availableStatuses={availableStatuses}
                             availableVersions={availableVersions}
+                            availableTaskTypes={availableTaskTypes}
                             onTeamSelect={handleTeamSelect}
                             onStatusSelect={handleStatusSelect}
                             onVersionSelect={handleVersionSelect}
+                            onTaskTypeSelect={handleTaskTypeSelect}
                             onDateChange={handleDateChange}
                             onClearFilters={clearFilters}
                         />
@@ -150,6 +165,7 @@ export default function Home() {
                         teamFilter={selectedTeams}
                         statusFilter={selectedStatuses}
                         versionFilter={selectedVersions}
+                        taskTypeFilter={selectedTaskTypes}
                         startDateFilter={startDate}
                         endDateFilter={endDate}
                     />

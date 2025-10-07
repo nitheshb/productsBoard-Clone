@@ -60,6 +60,7 @@ interface ProductTableProps {
   versionFilter?: string[];
   startDateFilter?: Date;
   endDateFilter?: Date;
+  taskTypeFilter?: string[];
 }
 
 export default function ProductTable({
@@ -69,6 +70,7 @@ export default function ProductTable({
   versionFilter = [],
   startDateFilter,
   endDateFilter,
+  taskTypeFilter = [],
 }: ProductTableProps) {
   const [allTableData, setAllTableData] = useState<TableItem[]>([]);
   const [tableData, setTableData] = useState<TableItem[]>([]);
@@ -118,25 +120,14 @@ export default function ProductTable({
     days: true,
     startDate: true,
     targetDate: true,
+    taskType: false, // Hide by default, show only when task types are selected
+    subTaskType: false, // Hide by default, show only when sub task types are selected
     completedon: false, // Hidden by default
     remarks: false, // Hidden by default
     description: false, // Hidden by default
   });
 
-  // Available columns configuration
-  const columnConfig = [
-    { key: 'name', label: 'Products, Components, Features', icon: null },
-    { key: 'version', label: 'Version', icon: '/globe.svg' },
-    { key: 'status', label: 'Status', icon: null },
-    { key: 'progress', label: 'Progress', icon: null },
-    { key: 'team', label: 'Team', icon: '/person.svg' },
-    { key: 'days', label: 'Days', icon: '/file_new.svg' },
-    { key: 'startDate', label: 'Start Date', icon: '/clock.svg' },
-    { key: 'targetDate', label: 'Target Date', icon: '/clock.svg' },
-    { key: 'completedon', label: 'Completion Time', icon: '/file_new.svg' },
-    { key: 'remarks', label: 'Remarks', icon: '/file_new.svg' },
-    { key: 'description', label: 'Description', icon: '/file_new.svg' },
-  ];
+  // Available columns configuration - moved after hasTaskTypes function
 
   // In the ProductTable component, add a ref to keep track of expandedItems across refreshes
   const expandedItemsRef = React.useRef(expandedItems);
@@ -153,11 +144,51 @@ export default function ProductTable({
     }));
   };
 
+  // Function to check if there are any features with task types
+  const hasTaskTypes = (data: TableItem[]): boolean => {
+    return data.some(item => {
+      if (item.type === 'feature' && (item.data as Feature).task_type) {
+        return true;
+      }
+      if (item.children) {
+        return hasTaskTypes(item.children);
+      }
+      return false;
+    });
+  };
+
+  // Available columns configuration
+  const columnConfig = [
+    { key: 'name', label: 'Task Name', icon: '/file_new.svg' },
+    { key: 'version', label: 'Version', icon: '/globe.svg' },
+    { key: 'status', label: 'Status', icon: '/check.svg' },
+    { key: 'progress', label: 'Progress', icon: '/progress.svg' },
+    { key: 'team', label: 'Team', icon: '/person.svg' },
+    { key: 'days', label: 'Days', icon: '/calendar.svg' },
+    { key: 'startDate', label: 'Start Date', icon: '/clock.svg' },
+    { key: 'targetDate', label: 'Target Date', icon: '/target.svg' },
+    { key: 'taskType', label: 'Task Type', icon: '/tag.svg' },
+    { key: 'subTaskType', label: 'Sub Task Type', icon: '/subtask.svg' },
+    { key: 'completedon', label: 'Completion Time', icon: '/completed.svg' },
+    { key: 'remarks', label: 'Remarks', icon: '/note.svg' },
+    { key: 'description', label: 'Description', icon: '/description.svg' },
+  ];
+
   // Force refresh function
   const triggerForceRefresh = () => {
     setForceRefresh(prev => prev + 1);
     console.log('Force refresh triggered');
   };
+
+  // Update column visibility based on data
+  useEffect(() => {
+    const hasTaskTypeData = hasTaskTypes(allTableData);
+    setVisibleColumns(prev => ({
+      ...prev,
+      taskType: hasTaskTypeData,
+      subTaskType: hasTaskTypeData
+    }));
+  }, [allTableData]);
 
   useEffect(() => {
     fetchProducts();
@@ -165,7 +196,7 @@ export default function ProductTable({
 
   useEffect(() => {
     filterTableData();
-  }, [selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, allTableData]);
+  }, [selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, taskTypeFilter, allTableData]);
   
   useEffect(() => {
     if (teamFilter.length > 0 || versionFilter.length > 0) {
@@ -426,6 +457,78 @@ export default function ProductTable({
       });
     }
 
+    // Apply task type filter - only show products that have features with selected task types
+    if (taskTypeFilter && taskTypeFilter.length > 0) {
+      // First, load all data for all products to check for matching features
+      const productsWithMatchingFeatures: TableItem[] = [];
+      
+      for (const product of filtered) {
+        // Load components if not already loaded
+        if (!product.children || product.children.length === 0) {
+          const components = await fetchComponents(product.id);
+          product.children = components as TableItem[];
+        }
+        
+        let hasMatchingFeature = false;
+        
+        if (product.children && Array.isArray(product.children)) {
+          for (const component of product.children) {
+            // Load features if not already loaded
+            if (!component.children || component.children.length === 0) {
+              const features = await fetchFeatures(component.id);
+              component.children = features as TableItem[];
+            }
+            
+            // Check if any feature matches the task type filter
+            if (component.children && Array.isArray(component.children)) {
+              for (const feature of component.children) {
+                if (feature.type === "feature") {
+                  const featureData = feature.data as Feature;
+                  if (featureData.task_type) {
+                    const featureMainType = getMainTaskTypeFromSubTask(featureData.task_type);
+                    if (featureMainType && taskTypeFilter.includes(featureMainType)) {
+                      hasMatchingFeature = true;
+                      break;
+                    }
+                    // Also check direct matches for main task types
+                    if (taskTypeFilter.includes(featureData.task_type)) {
+                      hasMatchingFeature = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (hasMatchingFeature) break;
+          }
+        }
+        
+        // Only include products that have matching features
+        if (hasMatchingFeature) {
+          productsWithMatchingFeatures.push(product);
+        }
+      }
+      
+      filtered = productsWithMatchingFeatures;
+
+      // Auto-expand all products that match the filter
+      const newExpandedItems: Record<string, boolean> = {};
+      for (const product of filtered) {
+        newExpandedItems[`product-${product.id}`] = true;
+        
+        if (product.children && Array.isArray(product.children)) {
+          for (const component of product.children) {
+            newExpandedItems[`component-${component.id}`] = true;
+          }
+        }
+      }
+      
+      setExpandedItems(prev => ({ ...prev, ...newExpandedItems }));
+    }
+
+    // Sub task type filter removed - only show main task types (Development, Testing)
+
     // Apply date filter with special handling for today's date
   //   if (startDateFilter || endDateFilter) {
   //     filtered = filtered
@@ -568,6 +671,94 @@ export default function ProductTable({
     if (item.children && Array.isArray(item.children)) {
       const filteredChildren = item.children
         .map(child => applyNestedStatusFilter(child, statuses))
+        .filter(Boolean);
+      
+      return {
+        ...item,
+        children: filteredChildren.length > 0 ? filteredChildren : undefined
+      };
+    }
+    
+    // If no children and not a feature, keep as is
+    return item;
+  }
+
+  // Helper function to determine if a feature belongs to a main task type category
+  function getMainTaskTypeFromSubTask(subTaskType: string): string | null {
+    // Development sub task types
+    if (['ui', 'ux', 'integration'].includes(subTaskType.toLowerCase())) {
+      return 'Development';
+    }
+    // Testing sub task types
+    if (['unit-testing', 'integration-testing', 'e2e-testing'].includes(subTaskType.toLowerCase())) {
+      return 'Testing';
+    }
+    // Direct main task types
+    if (['development', 'testing'].includes(subTaskType.toLowerCase())) {
+      return subTaskType.charAt(0).toUpperCase() + subTaskType.slice(1);
+    }
+    return null;
+  }
+
+  // Helper function to apply task type filter to nested structure
+  function applyNestedTaskTypeFilter(item: TableItem, taskTypes: string[]): TableItem {
+    // If it's a feature, check if its task type matches
+    if (item.type === "feature") {
+      const featureData = item.data as Feature;
+      if (featureData.task_type) {
+        // Check if the feature's task type belongs to any of the selected main task types
+        const featureMainType = getMainTaskTypeFromSubTask(featureData.task_type);
+        if (featureMainType && taskTypes.includes(featureMainType)) {
+          return item;
+        }
+        // Also check direct matches for main task types
+        if (taskTypes.includes(featureData.task_type)) {
+          return item;
+        }
+      }
+      return null as unknown as TableItem;
+    }
+    
+    // If it has children, filter them recursively
+    if (item.children && Array.isArray(item.children)) {
+      const filteredChildren = item.children
+        .map(child => applyNestedTaskTypeFilter(child, taskTypes))
+        .filter(Boolean);
+      
+      return {
+        ...item,
+        children: filteredChildren.length > 0 ? filteredChildren : undefined
+      };
+    }
+    
+    // If no children and not a feature, keep as is
+    return item;
+  }
+
+  // Helper function to apply sub task type filter to nested structure
+  function applyNestedSubTaskTypeFilter(item: TableItem, subTaskTypes: string[]): TableItem {
+    // If it's a feature, check if its task type matches (sub task types are stored in task_type field)
+    if (item.type === "feature") {
+      const featureData = item.data as Feature;
+      if (featureData.task_type) {
+        // Check for exact matches with sub task types
+        if (subTaskTypes.includes(featureData.task_type)) {
+          return item;
+        }
+        // Also check for normalized matches (handle case variations)
+        const normalizedTaskType = featureData.task_type.toLowerCase();
+        const normalizedSubTaskTypes = subTaskTypes.map(type => type.toLowerCase());
+        if (normalizedSubTaskTypes.includes(normalizedTaskType)) {
+          return item;
+        }
+      }
+      return null as unknown as TableItem;
+    }
+    
+    // If it has children, filter them recursively
+    if (item.children && Array.isArray(item.children)) {
+      const filteredChildren = item.children
+        .map(child => applyNestedSubTaskTypeFilter(child, subTaskTypes))
         .filter(Boolean);
       
       return {
@@ -1579,6 +1770,28 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               })()}
             </TableCell>
           )}
+          {visibleColumns.taskType && (
+            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {child.type === "feature" && (child.data as Feature).task_type ? (
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {(child.data as Feature).task_type}
+                </span>
+              ) : (
+                "-"
+              )}
+            </TableCell>
+          )}
+          {visibleColumns.subTaskType && (
+            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+              {child.type === "feature" && (child.data as Feature).task_type ? (
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  {(child.data as Feature).task_type}
+                </span>
+              ) : (
+                "-"
+              )}
+            </TableCell>
+          )}
           {visibleColumns.completedon && (
             <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
               {child.data.completedon || "-"}
@@ -2105,6 +2318,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
     return item.data.progress || 0;
   };
 
+
   return (
     <div className="w-full flex">
       {/* Left Side - Product Table */}
@@ -2207,6 +2421,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           }}
         />
 
+
         {selectedProduct && (
           <ProductDetailsPage
             productId={selectedProduct.data.id}
@@ -2270,7 +2485,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     Column Visibility
                   </div>
                   <DropdownMenuSeparator />
-                  {columnConfig.map((column) => (
+                  {columnConfig.map((column: { key: string; label: string; icon: string | null }) => (
                     <DropdownMenuCheckboxItem
                       key={column.key}
                       checked={visibleColumns[column.key]}
@@ -2368,6 +2583,20 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     <div className="flex items-center justify-center gap-1">
                       <img className="w-4 h-4" src="/clock.svg" alt="Target Date" />
                       Target Date
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.taskType && (
+                  <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      Task Type
+                    </div>
+                  </TableHead>
+                )}
+                {visibleColumns.subTaskType && (
+                  <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      Sub Task Type
                     </div>
                   </TableHead>
                 )}
@@ -2545,6 +2774,28 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                           if (typeof endDate === 'string') return endDate;
                           return (endDate as Date).toISOString().split('T')[0];
                         })()}
+                      </TableCell>
+                    )}
+                    {visibleColumns.taskType && (
+                      <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.type === "feature" && (item.data as Feature).task_type ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {(item.data as Feature).task_type}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.subTaskType && (
+                      <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        {item.type === "feature" && (item.data as Feature).task_type ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {(item.data as Feature).task_type}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                     )}
                     {visibleColumns.completedon && (
