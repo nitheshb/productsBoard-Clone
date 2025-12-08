@@ -32,7 +32,7 @@ export async function GET(
 
     // Fetch the product
     const { data: product, error: productError } = await supabase
-      .from('products')
+      .from('pb_products')
       .select('*')
       .eq('id', id)
       .single();
@@ -46,7 +46,7 @@ export async function GET(
 
     // Fetch components for this product
     const { data: components, error: componentsError } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('*')
       .eq('product_id', id);
 
@@ -58,7 +58,7 @@ export async function GET(
 
     if (componentIds.length > 0) {
       const { data: featuresData, error: featuresError } = await supabase
-        .from('features')
+        .from('pb_features')
         .select('*')
         .in('component_id', componentIds);
 
@@ -104,7 +104,7 @@ export async function PUT(
 
     // Check if product exists
     const { data: existingProduct, error: checkError } = await supabase
-      .from('products')
+      .from('pb_products')
       .select('id')
       .eq('id', id)
       .single();
@@ -157,7 +157,7 @@ export async function PUT(
     console.log('Updating product with fields:', updateFields);
 
     const { data, error } = await supabase
-      .from('products')
+      .from('pb_products')
       .update(updateFields)
       .eq('id', id)
       .select();
@@ -192,7 +192,7 @@ export async function DELETE(
 
     // Delete the product (cascade deletion will handle components and features)
     const { error } = await supabase
-      .from('products')
+      .from('pb_products')
       .delete()
       .eq('id', id);
 

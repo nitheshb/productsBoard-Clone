@@ -147,8 +147,12 @@ export default function ProductTable({
   // Function to check if there are any features with task types
   const hasTaskTypes = (data: TableItem[]): boolean => {
     return data.some(item => {
-      if (item.type === 'feature' && (item.data as Feature).task_type) {
-        return true;
+      if (item.type === 'feature') {
+        const featureData = item.data as Feature;
+        // Check if feature has either task_type or sub_task_type
+        if (featureData.task_type || featureData.sub_task_type) {
+          return true;
+        }
       }
       if (item.children) {
         return hasTaskTypes(item.children);
@@ -249,7 +253,7 @@ export default function ProductTable({
     try {
       setLoading(true);
       const { data: productsData, error: productsError } = await supabase
-        .from("products")
+        .from("pb_products")
         .select("*")
         .neq("name", "Sample Product 1");
       if (productsError) throw productsError;
@@ -257,7 +261,7 @@ export default function ProductTable({
       // Fetch all components for all products
       const productIds: string[] = (productsData as Product[]).map((p: Product) => p.id);
       const { data: allComponents, error: componentsError } = await supabase
-        .from("components")
+        .from("pb_components")
         .select("*")
         .in("product_id", productIds);
       if (componentsError) throw componentsError;
@@ -265,7 +269,7 @@ export default function ProductTable({
       // Fetch all features for all components
       const componentIds: string[] = (allComponents as Component[]).map((c: Component) => c.id);
       const { data: allFeatures, error: featuresError } = await supabase
-        .from("features")
+        .from("pb_features")
         .select("*")
         .in("component_id", componentIds);
       if (featuresError) throw featuresError;
@@ -484,17 +488,10 @@ export default function ProductTable({
               for (const feature of component.children) {
                 if (feature.type === "feature") {
                   const featureData = feature.data as Feature;
-                  if (featureData.task_type) {
-                    const featureMainType = getMainTaskTypeFromSubTask(featureData.task_type);
-                    if (featureMainType && taskTypeFilter.includes(featureMainType)) {
-                      hasMatchingFeature = true;
-                      break;
-                    }
-                    // Also check direct matches for main task types
-                    if (taskTypeFilter.includes(featureData.task_type)) {
-                      hasMatchingFeature = true;
-                      break;
-                    }
+                  // Direct match on task_type column
+                  if (featureData.task_type && taskTypeFilter.includes(featureData.task_type)) {
+                    hasMatchingFeature = true;
+                    break;
                   }
                 }
               }
@@ -683,38 +680,14 @@ export default function ProductTable({
     return item;
   }
 
-  // Helper function to determine if a feature belongs to a main task type category
-  function getMainTaskTypeFromSubTask(subTaskType: string): string | null {
-    // Development sub task types
-    if (['ui', 'ux', 'integration'].includes(subTaskType.toLowerCase())) {
-      return 'Development';
-    }
-    // Testing sub task types
-    if (['unit-testing', 'integration-testing', 'e2e-testing'].includes(subTaskType.toLowerCase())) {
-      return 'Testing';
-    }
-    // Direct main task types
-    if (['development', 'testing'].includes(subTaskType.toLowerCase())) {
-      return subTaskType.charAt(0).toUpperCase() + subTaskType.slice(1);
-    }
-    return null;
-  }
-
   // Helper function to apply task type filter to nested structure
   function applyNestedTaskTypeFilter(item: TableItem, taskTypes: string[]): TableItem {
     // If it's a feature, check if its task type matches
     if (item.type === "feature") {
       const featureData = item.data as Feature;
-      if (featureData.task_type) {
-        // Check if the feature's task type belongs to any of the selected main task types
-        const featureMainType = getMainTaskTypeFromSubTask(featureData.task_type);
-        if (featureMainType && taskTypes.includes(featureMainType)) {
-          return item;
-        }
-        // Also check direct matches for main task types
-        if (taskTypes.includes(featureData.task_type)) {
-          return item;
-        }
+      // Direct match on task_type column
+      if (featureData.task_type && taskTypes.includes(featureData.task_type)) {
+        return item;
       }
       return null as unknown as TableItem;
     }
@@ -737,20 +710,12 @@ export default function ProductTable({
 
   // Helper function to apply sub task type filter to nested structure
   function applyNestedSubTaskTypeFilter(item: TableItem, subTaskTypes: string[]): TableItem {
-    // If it's a feature, check if its task type matches (sub task types are stored in task_type field)
+    // If it's a feature, check if its sub task type matches (sub task types are stored in sub_task_type field)
     if (item.type === "feature") {
       const featureData = item.data as Feature;
-      if (featureData.task_type) {
-        // Check for exact matches with sub task types
-        if (subTaskTypes.includes(featureData.task_type)) {
-          return item;
-        }
-        // Also check for normalized matches (handle case variations)
-        const normalizedTaskType = featureData.task_type.toLowerCase();
-        const normalizedSubTaskTypes = subTaskTypes.map(type => type.toLowerCase());
-        if (normalizedSubTaskTypes.includes(normalizedTaskType)) {
-          return item;
-        }
+      // Direct match on sub_task_type column
+      if (featureData.sub_task_type && subTaskTypes.includes(featureData.sub_task_type)) {
+        return item;
       }
       return null as unknown as TableItem;
     }
@@ -802,7 +767,7 @@ export default function ProductTable({
     try {
       // Get all features for this component with team filter applied
       let featuresQuery = supabase
-        .from('features')
+        .from('pb_features')
         .select('progress, team, version')
         .eq('component_id', componentId);
 
@@ -831,7 +796,7 @@ export default function ProductTable({
 
       // Update the component's progress directly in the database
       const { error: updateError } = await supabase
-        .from('components')
+        .from('pb_components')
         .update({ progress: averageProgress })
         .eq('id', componentId);
 
@@ -849,7 +814,7 @@ export default function ProductTable({
     try {
       // Get all components for this product
       const { data: components, error: componentsError } = await supabase
-        .from('components')
+        .from('pb_components')
         .select('id, progress')
         .eq('product_id', productId);
 
@@ -862,7 +827,7 @@ export default function ProductTable({
 
       // Get the updated components
       const { data: updatedComponents, error: updatedError } = await supabase
-        .from('components')
+        .from('pb_components')
         .select('progress')
         .eq('product_id', productId);
 
@@ -881,7 +846,7 @@ export default function ProductTable({
 
       // Update the product progress in the database
       const { error: updateError } = await supabase
-        .from('products')
+        .from('pb_products')
         .update({ progress: averageProgress })
         .eq('id', productId);
 
@@ -913,7 +878,7 @@ export default function ProductTable({
 
       if (productIds.length > 0) {
         const { data: updatedProducts } = await supabase
-          .from("products")
+          .from("pb_products")
           .select("*")
           .in("id", productIds);
 
@@ -1150,7 +1115,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   async function createNewProduct(name: string, status: string = 'Todo', progress: number = 0, version: string = '1.0.0') {
     try {
       const { data, error } = await supabase
-        .from("products")
+        .from("pb_products")
         .insert([{ name, status, progress, version }])
         .select();
       if (error) throw error;
@@ -1382,7 +1347,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   async function fetchComponents(productId: string) {
     try {
       const { data: componentsData, error: componentsError } = await supabase
-        .from("components")
+        .from("pb_components")
         .select("*")
         .eq("product_id", productId);
 
@@ -1410,7 +1375,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   async function fetchFeatures(componentId: string) {
     try {
       const { data: featuresData, error: featuresError } = await supabase
-        .from("features")
+        .from("pb_features")
         .select("*")
         .eq("component_id", componentId);
 
@@ -1783,9 +1748,9 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           )}
           {visibleColumns.subTaskType && (
             <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.type === "feature" && (child.data as Feature).task_type ? (
+              {child.type === "feature" && (child.data as Feature).sub_task_type ? (
                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {(child.data as Feature).task_type}
+                  {(child.data as Feature).sub_task_type}
                 </span>
               ) : (
                 "-"
@@ -2789,9 +2754,9 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     )}
                     {visibleColumns.subTaskType && (
                       <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        {item.type === "feature" && (item.data as Feature).task_type ? (
+                        {item.type === "feature" && (item.data as Feature).sub_task_type ? (
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {(item.data as Feature).task_type}
+                            {(item.data as Feature).sub_task_type}
                           </span>
                         ) : (
                           "-"

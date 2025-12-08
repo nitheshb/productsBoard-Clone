@@ -62,12 +62,14 @@ export interface Feature {
   version_progress?: VersionProgress[];
   created_at: string;
   updated_at?: string;
-  task_type?: string; // New field for task type (dev, testing, ux, etc.)
+  task_type?: string; // Main task type (Development, Testing)
+  sub_task_type?: string; // Sub task type (UI, UX, Integration, Unit Testing, etc.)
 }
 
 // New interface for multi-task creation
 export interface MultiTaskItem {
-  task_type: string;
+  task_type: string; // Main task type (Development, Testing)
+  sub_task_type: string; // Sub task type (UI, UX, Integration, etc.)
   name: string;
   status: string;
   progress: number;

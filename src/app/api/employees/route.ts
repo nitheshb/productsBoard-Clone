@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     // Fetch unique teams from the database
     const { data: teamData, error: teamError } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('team')
       .not('team', 'is', null);
 

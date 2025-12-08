@@ -39,7 +39,7 @@ export default function Home() {
                 
                 // Fetch unique status values from database
                 const { data: statusData, error: statusError } = await supabase
-                    .from('features')
+                    .from('pb_features')
                     .select('status')
                     .not('status', 'is', null);
                 
@@ -50,7 +50,7 @@ export default function Home() {
 
                 // Fetch versions from database
                 const { data: versionData, error: versionError } = await supabase
-                    .from('versions')
+                    .from('pb_versions')
                     .select('version')
                     .order('version', { ascending: true });
                 

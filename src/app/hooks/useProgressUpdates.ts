@@ -14,7 +14,7 @@
       
 //       // Get the component to find its product
 //       const { data: component } = await supabase
-//         .from('components')
+//         .from('pb_components')
 //         .select('product_id')
 //         .eq('id', componentId)
 //         .single();
@@ -73,7 +73,7 @@ export function useProgressUpdates() {
       
       // Get the component to find its product
       const { data: component } = await supabase
-        .from('components')
+        .from('pb_components')
         .select('product_id')
         .eq('id', componentId)
         .single();
@@ -121,7 +121,7 @@ export function useProgressUpdates() {
       // Get updated product data with latest progress
       if (productIds.length > 0) {
         const { data: updatedProducts } = await supabase
-          .from("products")
+          .from("pb_products")
           .select("*")
           .in("id", productIds);
 
@@ -154,7 +154,7 @@ export function useProgressUpdates() {
       // Get updated component data
       if (componentIds.length > 0) {
         const { data: updatedComponents } = await supabase
-          .from("components")
+          .from("pb_components")
           .select("*")
           .in("id", componentIds);
 

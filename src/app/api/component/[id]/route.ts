@@ -37,7 +37,7 @@ export async function GET(
 
     // Fetch the component
     const { data: component, error: componentError } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('*')
       .eq('id', id)
       .single();
@@ -52,7 +52,7 @@ export async function GET(
 
     // Fetch features for this component
     const { data: features, error: featuresError } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('*')
       .eq('component_id', id);
 
@@ -88,7 +88,7 @@ export async function PUT(
 
     // Check if component exists and get its product_id
     const { data: existingComponent, error: checkError } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('id, product_id')
       .eq('id', id)
       .single();
@@ -158,7 +158,7 @@ export async function PUT(
     console.log('Updating component with fields:', updateFields);
     
     const { data, error } = await supabase
-      .from('components')
+      .from('pb_components')
       .update(updateFields)
       .eq('id', id)
       .select();
@@ -196,7 +196,7 @@ export async function DELETE(
 
     // Get the product_id before deleting
     const { data: component, error: fetchError } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('product_id')
       .eq('id', id)
       .single();
@@ -207,7 +207,7 @@ export async function DELETE(
 
     // Delete the component (cascade deletion will handle features)
     const { error } = await supabase
-      .from('components')
+      .from('pb_components')
       .delete()
       .eq('id', id);
 

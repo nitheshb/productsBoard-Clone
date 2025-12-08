@@ -6,7 +6,7 @@ export const calculateComponentVersionProgress = async (componentId: string): Pr
   try {
     // Get all features for this component
     const { data: features, error } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('version, progress')
       .eq('component_id', componentId);
 
@@ -47,7 +47,7 @@ export const calculateProductVersionProgress = async (productId: string): Promis
   try {
     // Get all components for this product
     const { data: components, error } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('version, progress')
       .eq('product_id', productId);
 
@@ -89,7 +89,7 @@ export const updateComponentVersionProgress = async (componentId: string): Promi
     const versionProgress = await calculateComponentVersionProgress(componentId);
     
     const { error } = await supabase
-      .from('components')
+      .from('pb_components')
       .update({ version_progress: versionProgress })
       .eq('id', componentId);
 
@@ -106,7 +106,7 @@ export const updateProductVersionProgress = async (productId: string): Promise<v
     const versionProgress = await calculateProductVersionProgress(productId);
     
     const { error } = await supabase
-      .from('products')
+      .from('pb_products')
       .update({ version_progress: versionProgress })
       .eq('id', productId);
 
@@ -124,7 +124,7 @@ export const updateParentComponentVersionProgress = async (componentId: string):
     
     // Get the component to find its parent product
     const { data: component, error } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('product_id')
       .eq('id', componentId)
       .single();

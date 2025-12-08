@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const productId = searchParams.get('product_id');
     const version = searchParams.get('version');
 
-    let query = supabase.from('components').select('*');
+    let query = supabase.from('pb_components').select('*');
 
     if (productId) {
       query = query.eq('product_id', productId);
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Create the component
     const { data, error } = await supabase
-      .from('components')
+      .from('pb_components')
       .insert([{
         name: componentData.name,
         product_id: componentData.product_id,

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('features')
+      .from('pb_features')
       .insert([{
         name: featureData.name,
         component_id: featureData.component_id,
@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
         remarks: featureData.remarks || null,
         description: featureData.description || null,
         version: featureData.version || '1.0.0',
-        task_type: featureData.task_type || null
+        task_type: featureData.task_type || null,
+        sub_task_type: featureData.sub_task_type || null
       }])
       .select();
 
