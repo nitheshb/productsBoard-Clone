@@ -14,7 +14,7 @@
 //   const fetchComponents = useCallback(async (productId: string, teamFilter: string[] = []) => {
 //     try {
 //       const { data: componentsData, error: componentsError } = await supabase
-//         .from("components")
+//         .from("pb_components")
 //         .select("*")
 //         .eq("product_id", productId);
 
@@ -36,7 +36,7 @@
           
 //           // Fetch updated components with correct progress
 //           const { data: updatedComponents } = await supabase
-//             .from("components")
+//             .from("pb_components")
 //             .select("*")
 //             .eq("product_id", productId);
             
@@ -65,7 +65,7 @@
 //     try {
 //       // Construct our base query to get all features for this component
 //       let query = supabase
-//         .from("features")
+//         .from("pb_features")
 //         .select("*")
 //         .eq("component_id", componentId);
       
@@ -150,7 +150,7 @@
               
 //               // Get updated component data with correct progress
 //               const { data: updatedComponent } = await supabase
-//                 .from("components")
+//                 .from("pb_components")
 //                 .select("*")
 //                 .eq("id", id)
 //                 .single();

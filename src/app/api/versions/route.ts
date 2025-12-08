@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 export async function GET(request: NextRequest) {
   try {
     const { data: versions, error } = await supabase
-      .from('versions')
+      .from('pb_versions')
       .select('*')
       .order('version', { ascending: true });
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Check if version already exists
     const { data: existingVersion, error: checkError } = await supabase
-      .from('versions')
+      .from('pb_versions')
       .select('id')
       .eq('version', body.version)
       .single();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Create the version
     const { data, error } = await supabase
-      .from('versions')
+      .from('pb_versions')
       .insert([{
         version: body.version,
         description: body.description || null

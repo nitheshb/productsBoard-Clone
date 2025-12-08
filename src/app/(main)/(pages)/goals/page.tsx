@@ -668,7 +668,7 @@ export default function GoalsPage() {
       
       try {
         const { data: goalData, error: goalError } = await supabase
-          .from('components')
+          .from('pb_components')
           .select('id, name, description, startdate, targetdate, status, progress, created_at')
           .not('startdate', 'is', null)
           .not('targetdate', 'is', null);

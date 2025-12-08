@@ -56,9 +56,9 @@ export async function fetchExistingTeamMembers(forceRefresh = false): Promise<Te
   try {
     // Get unique team members from all tables that have team field
     const [productsResult, componentsResult, featuresResult] = await Promise.all([
-      supabase.from('products').select('team').not('team', 'is', null),
-      supabase.from('components').select('team').not('team', 'is', null),
-      supabase.from('features').select('team').not('team', 'is', null)
+      supabase.from('pb_products').select('team').not('team', 'is', null),
+      supabase.from('pb_components').select('team').not('team', 'is', null),
+      supabase.from('pb_features').select('team').not('team', 'is', null)
     ]);
 
     // Combine all team members

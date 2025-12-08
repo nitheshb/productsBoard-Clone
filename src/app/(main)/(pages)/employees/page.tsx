@@ -262,7 +262,7 @@ export default function EmployeesPage() {
       try {
         // Fetch actual team names from the database
         const { data: teamData, error: teamError } = await supabase
-          .from('features')
+          .from('pb_features')
           .select('team')
           .not('team', 'is', null);
 
@@ -289,7 +289,7 @@ export default function EmployeesPage() {
 
         // Fetch tasks from features table
         const { data: taskData, error: taskError } = await supabase
-          .from('features')
+          .from('pb_features')
           .select('id, name, description, team, startdate, targetdate, status, created_at')
           .not('team', 'is', null);
 

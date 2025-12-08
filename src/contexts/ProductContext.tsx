@@ -63,17 +63,17 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       try {
         // Fetch products
-        const productsResponse = await supabase.from('products').select('*');
+        const productsResponse = await supabase.from('pb_products').select('*');
         if (productsResponse.error) throw productsResponse.error;
         const productsData = productsResponse.data || [];
 
         // Fetch components
-        const componentsResponse = await supabase.from('components').select('*');
+        const componentsResponse = await supabase.from('pb_components').select('*');
         if (componentsResponse.error) throw componentsResponse.error;
         const componentsData = componentsResponse.data || [];
 
         // Fetch features
-        const featuresResponse = await supabase.from('features').select('*');
+        const featuresResponse = await supabase.from('pb_features').select('*');
         if (featuresResponse.error) throw featuresResponse.error;
         const featuresData = featuresResponse.data || [];
 

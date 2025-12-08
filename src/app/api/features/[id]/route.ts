@@ -33,7 +33,7 @@ export async function GET(
 
     // Fetch the feature
     const { data, error } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('*')
       .eq('id', id)
       .single();
@@ -63,7 +63,7 @@ export async function PUT(
 
     // Check if feature exists and get its component_id
     const { data: existingFeature, error: checkError } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('id, component_id')
       .eq('id', id)
       .single();
@@ -95,7 +95,9 @@ export async function PUT(
       remarks: body.remarks ?? null,
       description: body.description ?? null,
       version: body.version ?? null,
-      component_id: body.component_id ?? null
+      component_id: body.component_id ?? null,
+      task_type: body.task_type ?? null,
+      sub_task_type: body.sub_task_type ?? null
     };
 
     // Remove any undefined values to prevent database errors
@@ -116,7 +118,7 @@ export async function PUT(
     let updateData;
     try {
       const { data, error } = await supabase
-        .from('features')
+        .from('pb_features')
         .update(updateFields)
         .eq('id', id)
         .select();
@@ -166,7 +168,7 @@ export async function DELETE(
 
     // Get the component_id before deleting
     const { data: feature, error: fetchError } = await supabase
-      .from('features')
+      .from('pb_features')
       .select('component_id')
       .eq('id', id)
       .single();
@@ -177,7 +179,7 @@ export async function DELETE(
 
     // Delete the feature
     const { error } = await supabase
-      .from('features')
+      .from('pb_features')
       .delete()
       .eq('id', id);
 

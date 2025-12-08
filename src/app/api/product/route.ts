@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch products only, with columns matching the schema
     let query = supabase
-      .from('products')
+      .from('pb_products')
       .select('id, name, status, progress, version, team, days, startdate, targetdate, completedon, remarks, description, created_at, updated_at')
       .order('created_at', { ascending: false });
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Create the product with fields matching the schema
     const { data, error } = await supabase
-      .from('products')
+      .from('pb_products')
       .insert([{
         name: body.name,
         status: body.status || null,

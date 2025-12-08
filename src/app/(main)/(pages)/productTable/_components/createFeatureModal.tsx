@@ -129,26 +129,40 @@ export function CreateFeatureModal({
 
   // Initialize task items when sub task types are selected (only for multi-task tab)
   React.useEffect(() => {
-    if (activeTab === "multi-task" && selectedSubTaskTypes.length > 0) {
-      const newTaskItems = selectedSubTaskTypes.map(subTaskType => ({
-        task_type: subTaskType,
-        name: '',
-        status: 'Todo',
-        progress: 0,
-        team: '',
-        days: null,
-        startdate: null,
-        targetdate: null,
-        completedon: null,
-        remarks: '',
-        description: '',
-        version: '1.0.0',
-      }));
+    if (activeTab === "multi-task" && selectedSubTaskTypes.length > 0 && selectedTaskType) {
+      // Get the display name for the main task type (e.g., 'development' -> 'Development')
+      const mainTaskTypeInfo = TASK_TYPES.find(t => t.id === selectedTaskType);
+      const mainTaskTypeName = mainTaskTypeInfo?.name || selectedTaskType.charAt(0).toUpperCase() + selectedTaskType.slice(1);
+      
+      const newTaskItems = selectedSubTaskTypes.map(subTaskTypeId => {
+        // Get the display name for the sub task type (e.g., 'ui' -> 'UI')
+        const subTaskTypes = SUB_TASK_TYPES[selectedTaskType as keyof typeof SUB_TASK_TYPES];
+        const subTaskTypeInfo = subTaskTypes?.find(
+          (t: any) => t.id === subTaskTypeId
+        );
+        const subTaskTypeName = subTaskTypeInfo?.name || subTaskTypeId;
+        
+        return {
+          task_type: mainTaskTypeName, // Store main task type display name (Development, Testing)
+          sub_task_type: subTaskTypeName, // Store sub task type display name (UI, UX, Integration, etc.)
+          name: '',
+          status: 'Todo',
+          progress: 0,
+          team: '',
+          days: null,
+          startdate: null,
+          targetdate: null,
+          completedon: null,
+          remarks: '',
+          description: '',
+          version: '1.0.0',
+        };
+      });
       setTaskItems(newTaskItems);
     } else {
       setTaskItems([]);
     }
-  }, [selectedSubTaskTypes, activeTab]);
+  }, [selectedSubTaskTypes, selectedTaskType, activeTab]);
 
   // Reset form when modal is closed and reopened
   React.useEffect(() => {
@@ -289,10 +303,10 @@ export function CreateFeatureModal({
 
   // Multi-task handlers (only for the new tab)
 
-  const updateTaskItem = (taskType: string, field: keyof MultiTaskItem, value: any) => {
+  const updateTaskItem = (taskSubType: string, field: keyof MultiTaskItem, value: any) => {
     setTaskItems(prev => 
       prev.map(item => 
-        item.task_type === taskType 
+        item.sub_task_type === taskSubType 
           ? { ...item, [field]: value }
           : item
       )
@@ -369,7 +383,7 @@ export function CreateFeatureModal({
 
           if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Failed to create ${taskItem.task_type} task: ${errorText}`);
+            throw new Error(`Failed to create ${taskItem.sub_task_type} task: ${errorText}`);
           }
 
           const createdTask = await response.json();
@@ -735,11 +749,14 @@ export function CreateFeatureModal({
               </thead>
               <tbody>
                 {taskItems.map((taskItem, index) => {
-                  const subTaskTypeInfo = selectedTaskType && SUB_TASK_TYPES[selectedTaskType as keyof typeof SUB_TASK_TYPES]?.find((t: any) => t.id === taskItem.task_type);
+                  // Since we're now storing display names, we need to find the color by matching the name
+                  const subTaskTypeInfo = selectedTaskType && SUB_TASK_TYPES[selectedTaskType as keyof typeof SUB_TASK_TYPES]?.find(
+                    (t: any) => t.name === taskItem.sub_task_type || t.id === taskItem.sub_task_type
+                  );
                   const taskColor = subTaskTypeInfo ? (subTaskTypeInfo as any).color : '#3B82F6';
-                  const taskName = subTaskTypeInfo ? (subTaskTypeInfo as any).name : taskItem.task_type;
+                  const taskName = taskItem.sub_task_type; // Already a display name now
                   return (
-                    <tr key={taskItem.task_type} className="border-b border-gray-100">
+                    <tr key={`${taskItem.task_type}-${taskItem.sub_task_type}-${index}`} className="border-b border-gray-100">
                       <td className="px-4 py-3 w-24">
                         <div className="flex items-center gap-2">
                           <div 
@@ -752,7 +769,7 @@ export function CreateFeatureModal({
                       <td className="px-4 py-3 w-64">
                         <Input
                           value={taskItem.name}
-                          onChange={(e) => updateTaskItem(taskItem.task_type, 'name', e.target.value)}
+                          onChange={(e) => updateTaskItem(taskItem.sub_task_type, 'name', e.target.value)}
                           className="w-full h-9 text-sm border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Enter task name"
                           required
@@ -761,15 +778,15 @@ export function CreateFeatureModal({
                       <td className="px-4 py-3 w-32 min-w-[128px] max-w-[128px]">
                         <div className="w-full">
                           <TeamFilter
-                            selectedTeams={selectedTeamForTask[taskItem.task_type] ? [selectedTeamForTask[taskItem.task_type]] : []}
+                            selectedTeams={selectedTeamForTask[taskItem.sub_task_type] ? [selectedTeamForTask[taskItem.sub_task_type]] : []}
                             availableTeams={availableTeams}
                             onTeamSelect={(teams) => {
                               const team = teams[0] || '';
                               setSelectedTeamForTask(prev => ({
                                 ...prev,
-                                [taskItem.task_type]: team
+                                [taskItem.sub_task_type]: team
                               }));
-                              updateTaskItem(taskItem.task_type, 'team', team || null);
+                              updateTaskItem(taskItem.sub_task_type, 'team', team || null);
                             }}
                           />
                         </div>
@@ -778,7 +795,7 @@ export function CreateFeatureModal({
                         <Input
                           type="number"
                           value={taskItem.days || ''}
-                          onChange={(e) => updateTaskItem(taskItem.task_type, 'days', e.target.value ? parseInt(e.target.value) : null)}
+                          onChange={(e) => updateTaskItem(taskItem.sub_task_type, 'days', e.target.value ? parseInt(e.target.value) : null)}
                           className="w-full h-9 text-sm border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Days"
                         />
@@ -787,7 +804,7 @@ export function CreateFeatureModal({
                         <Input
                           type="date"
                           value={taskItem.startdate || ''}
-                          onChange={(e) => updateTaskItem(taskItem.task_type, 'startdate', e.target.value || null)}
+                          onChange={(e) => updateTaskItem(taskItem.sub_task_type, 'startdate', e.target.value || null)}
                           className="w-full h-9 text-sm border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </td>
@@ -795,7 +812,7 @@ export function CreateFeatureModal({
                         <Input
                           type="date"
                           value={taskItem.targetdate || ''}
-                          onChange={(e) => updateTaskItem(taskItem.task_type, 'targetdate', e.target.value || null)}
+                          onChange={(e) => updateTaskItem(taskItem.sub_task_type, 'targetdate', e.target.value || null)}
                           className="w-full h-9 text-sm border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </td>

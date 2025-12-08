@@ -58,7 +58,7 @@ export const getStatusFromChildrenStatus = (childrenStatuses: string[]): string 
 export const updateComponentProgressInDb = async (componentId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
     let query = supabase
-      .from('features')
+      .from('pb_features')
       .select('progress, team, version, status')
       .eq('component_id', componentId);
       
@@ -76,7 +76,7 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
 
     if (!features || features.length === 0) {
       await supabase
-        .from('components')
+        .from('pb_components')
         .update({ progress: 0, status: 'Todo' })
         .eq('id', componentId);
       return 0;
@@ -98,7 +98,7 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
     const status = getStatusFromChildrenStatus(featureStatuses);
 
     await supabase
-      .from('components')
+      .from('pb_components')
       .update({ progress: average, status: status })
       .eq('id', componentId);
     
@@ -115,7 +115,7 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
 export const updateProductProgressInDb = async (productId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
     let componentsQuery = supabase
-      .from('components')
+      .from('pb_components')
       .select('id, progress, version, status')
       .eq('product_id', productId);
       
@@ -129,7 +129,7 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
     if (componentsError) throw componentsError;
     if (!components || components.length === 0) {
       await supabase
-        .from('products')
+        .from('pb_products')
         .update({ progress: 0, status: 'Todo' })
         .eq('id', productId);
       return 0;
@@ -153,7 +153,7 @@ export const updateProductProgressInDb = async (productId: string, teamFilter: s
     const status = getStatusFromChildrenStatus(componentStatuses);
 
     const { error: updateError } = await supabase
-      .from('products')
+      .from('pb_products')
       .update({ progress: averageProgress, status: status })
       .eq('id', productId);
       
@@ -197,7 +197,7 @@ export const updateProductProgressWithParents = async (productId: string, teamFi
 export const updateProductProgressWithComponentRecalculation = async (productId: string, teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
     let componentsQuery = supabase
-      .from('components')
+      .from('pb_components')
       .select('id, progress, version, status')
       .eq('product_id', productId);
 
@@ -206,7 +206,7 @@ export const updateProductProgressWithComponentRecalculation = async (productId:
     if (componentsError) throw componentsError;
     if (!components || components.length === 0) {
       await supabase
-        .from('products')
+        .from('pb_products')
         .update({ progress: 0, status: 'Todo' })
         .eq('id', productId);
       return 0;
@@ -221,7 +221,7 @@ export const updateProductProgressWithComponentRecalculation = async (productId:
 
     // Then calculate product progress from updated component values
     const { data: updatedComponents, error: updatedError } = await supabase
-      .from('components')
+      .from('pb_components')
       .select('progress, status')
       .eq('product_id', productId);
       
@@ -244,7 +244,7 @@ export const updateProductProgressWithComponentRecalculation = async (productId:
     const status = getStatusFromChildrenStatus(componentStatuses);
 
     const { error: updateError } = await supabase
-      .from('products')
+      .from('pb_products')
       .update({ progress: averageProgress, status: status })
       .eq('id', productId);
       
@@ -263,7 +263,7 @@ export const updateProductProgressWithComponentRecalculation = async (productId:
 export const updateAllProgress = async (teamFilter: string[] = [], versionFilter: string[] = []) => {
   try {
     const productsQuery = supabase
-      .from('products')
+      .from('pb_products')
       .select('id, version');
       
     const { data: products, error } = await productsQuery;
