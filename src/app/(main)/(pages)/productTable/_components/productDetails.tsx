@@ -374,7 +374,18 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
     setDraftProduct(prev => {
       if (!prev) return null;
       
-      const updatedDraft = { ...prev, [field]: value };
+      let updatedDraft: any = { ...prev };
+      if (field === 'team') {
+        if (typeof value === 'string') {
+          updatedDraft.team = value;
+          updatedDraft.team_id = null;
+        } else if (value && typeof value === 'object') {
+          updatedDraft.team = value.name;
+          updatedDraft.team_id = value.id || null;
+        }
+      } else {
+        updatedDraft = { ...prev, [field]: value };
+      }
       
       // Automatically update status based on progress
       if (field === 'progress') {

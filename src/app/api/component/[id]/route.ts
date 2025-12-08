@@ -120,6 +120,7 @@ export async function PUT(
       status: updateData.status ?? null,
       progress: updateData.progress ?? null,
       team: updateData.team ?? null,
+      team_id: updateData.team_id ?? null,
       days: updateData.days ?? null,
       startdate: updateData.startDate ?? updateData.startdate ?? null,
       targetdate: updateData.targetDate ?? updateData.targetdate ?? null,

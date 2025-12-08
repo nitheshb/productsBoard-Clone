@@ -15,6 +15,7 @@ export interface Product {
   version?: string;
   version_progress?: VersionProgress[];
   team?: string;
+  team_id?: string | null;
   days?: number;
   startdate?: string;
   targetdate?: string;
@@ -32,6 +33,7 @@ export interface Component {
   status?: string;
   progress?: number;
   team?: string;
+  team_id?: string | null;
   days?: number;
   startdate?: string;
   targetdate?: string;
@@ -52,6 +54,7 @@ export interface Feature {
   status?: string;
   progress?: number;
   team?: string;
+  team_id?: string | null;
   days?: number;
   startdate?: string;
   targetdate?: string;
@@ -74,6 +77,7 @@ export interface MultiTaskItem {
   status: string;
   progress: number;
   team: string;
+  team_id?: string | null;
   days: number | null;
   startdate: string | null;
   targetdate: string | null;

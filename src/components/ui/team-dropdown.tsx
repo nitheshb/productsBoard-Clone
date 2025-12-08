@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, User } from 'lucide-react';
-import { fetchExistingTeamMembers, addTeamMemberToCache, TeamMember } from '@/utils/teamUtils';
+import { fetchExistingTeamMembers, addTeamMemberToCache, addTeamMember, TeamMember } from '@/utils/teamUtils';
 import { teamEventEmitter } from '@/utils/teamEventEmitter';
 
 interface TeamDropdownProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string | { id?: string; name: string }) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -84,20 +84,22 @@ export function TeamDropdown({
     }
   }, [isOpen]);
 
-  const handleSelectTeam = (teamName: string) => {
-    onChange(teamName);
+  const handleSelectTeam = (member: TeamMember) => {
+    if (member.id) {
+      onChange({ id: member.id, name: member.name });
+    } else {
+      onChange(member.name);
+    }
     setIsOpen(false);
     setNewTeamName('');
   };
 
-  const handleAddNewTeam = () => {
+  const handleAddNewTeam = async () => {
     if (newTeamName.trim()) {
       const trimmedName = newTeamName.trim();
-      
-      // Add to cache immediately for real-time updates
+
+      // Optimistic UI: add to cache and local state immediately
       addTeamMemberToCache(trimmedName);
-      
-      // Update the local state immediately
       setTeamMembers(prev => {
         const existingMember = prev.find(member => member.name === trimmedName);
         if (existingMember) {
@@ -107,10 +109,24 @@ export function TeamDropdown({
         }
         return [...prev].sort((a, b) => b.count - a.count);
       });
-      
+
       onChange(trimmedName);
       setIsOpen(false);
       setNewTeamName('');
+
+      // Persist to database; if it fails, log error (we keep optimistic entry)
+      try {
+        const result = await addTeamMember(trimmedName);
+        if (result && result.id) {
+          // If we got an id back, inform parent with id+name
+          onChange({ id: result.id, name: result.name });
+        } else {
+          // Fallback to name only
+          onChange(trimmedName);
+        }
+      } catch (err) {
+        console.error('Error persisting new team member:', err);
+      }
     }
   };
 
@@ -161,7 +177,7 @@ export function TeamDropdown({
                     <button
                       key={index}
                       type="button"
-                      onClick={() => handleSelectTeam(member.name)}
+                      onClick={() => handleSelectTeam(member)}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
                     >
                       <div className="flex items-center">

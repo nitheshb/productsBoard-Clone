@@ -88,6 +88,7 @@ export async function PUT(
       status: body.status ?? null,
       progress: body.progress ?? null,
       team: body.team ?? null,
+      team_id: body.team_id ?? null,
       days: body.days ?? null,
       startdate: body.startdate ?? null,
       targetdate: body.targetdate ?? null,

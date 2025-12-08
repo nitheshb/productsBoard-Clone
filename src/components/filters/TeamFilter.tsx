@@ -11,17 +11,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { fetchExistingTeamMembers, teamEventEmitter, addTeamMemberToCache } from '@/utils/teamUtils';
+import { fetchExistingTeamMembers, teamEventEmitter, addTeamMemberToCache, addTeamMember, TeamMember } from '@/utils/teamUtils';
 
 interface TeamFilterProps {
-  selectedTeams: string[];
-  onTeamSelect: (teams: string[]) => void;
-  availableTeams: string[];
+  selectedTeams: Array<string | TeamMember>;
+  onTeamSelect: (teams: Array<string | TeamMember>) => void;
+  availableTeams: Array<string | TeamMember>;
 }
 
 export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: TeamFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [localTeams, setLocalTeams] = useState<string[]>(availableTeams);
+  const [localTeams, setLocalTeams] = useState<Array<string | TeamMember>>(availableTeams);
   const [newTeamName, setNewTeamName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +34,9 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
   useEffect(() => {
     const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
       setLocalTeams(prev => {
-        if (!prev.includes(teamName)) {
+        // If prev already contains this name (string or object), skip
+        const exists = prev.some(t => (typeof t === 'string' ? t === teamName : t.name === teamName));
+        if (!exists) {
           return [...prev, teamName];
         }
         return prev;
@@ -44,36 +46,55 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
     return unsubscribe;
   }, []);
 
-  const handleTeamToggle = (team: string) => {
-    // For single selection: if the team is already selected, deselect it; otherwise, select only this team
-    const updatedTeams = selectedTeams.includes(team) 
-      ? [] // Deselect if already selected
-      : [team]; // Select only this team (single selection)
+  const handleTeamToggle = (team: string | TeamMember) => {
+    // Normalize selection by name or id
+    const teamKey = typeof team === 'string' ? team : (team.id || team.name);
 
+    const isSelected = selectedTeams.some(t => {
+      if (typeof t === 'string') return t === teamKey;
+      return (t.id && teamKey === t.id) || t.name === teamKey;
+    });
+
+    const updatedTeams = isSelected ? [] : [team];
     onTeamSelect(updatedTeams);
   };
 
-  const handleAddNewTeam = () => {
+  const handleAddNewTeam = async () => {
     if (newTeamName.trim()) {
       const trimmedName = newTeamName.trim();
-      
+
       // Add to cache immediately for real-time updates
       addTeamMemberToCache(trimmedName);
-      
-      // Update local teams list
+
+      // Update local teams list (as string for now)
       setLocalTeams(prev => {
-        if (!prev.includes(trimmedName)) {
+        const exists = prev.some(t => (typeof t === 'string' ? t === trimmedName : t.name === trimmedName));
+        if (!exists) {
           return [...prev, trimmedName];
         }
         return prev;
       });
-      
+
       // Add to selected teams
-      if (!selectedTeams.includes(trimmedName)) {
+      const alreadySelected = selectedTeams.some(t => (typeof t === 'string' ? t === trimmedName : t.name === trimmedName));
+      if (!alreadySelected) {
         onTeamSelect([...selectedTeams, trimmedName]);
       }
-      
       setNewTeamName('');
+
+      // Persist to pb_employees asynchronously; if it returns an id, update local list and selection
+      try {
+        const result = await addTeamMember(trimmedName);
+        if (result) {
+          // Replace string entry with object that includes id
+          setLocalTeams(prev => prev.map(t => (typeof t === 'string' && t === trimmedName ? result : t)));
+          // Update selectedTeams to carry id as well
+          const newSelection = selectedTeams.map(t => (typeof t === 'string' && t === trimmedName ? result : t));
+          onTeamSelect(newSelection);
+        }
+      } catch (err) {
+        console.error('Error persisting new team member:', err);
+      }
     }
   };
 
@@ -100,7 +121,7 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
         <Button variant="outline" size="sm" className="h-8 gap-1 bg-white hover:bg-gray-50 border-gray-300 w-full min-w-[120px] max-w-[140px]">
           <Users className="h-4 w-4" />
           <span className="truncate">
-            {selectedTeams.length > 0 ? selectedTeams[0] : "Select Team"}
+            {selectedTeams.length > 0 ? (typeof selectedTeams[0] === 'string' ? selectedTeams[0] : selectedTeams[0].name) : "Select Team"}
           </span>
           <ChevronDown className="h-4 w-4" />
         </Button>
@@ -111,24 +132,33 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
         </DropdownMenuLabel>
         
         <div className="max-h-48 overflow-y-auto">
-          {localTeams.map((team) => (
-            <DropdownMenuCheckboxItem
-              key={team}
-              checked={selectedTeams.includes(team)}
-              onSelect={(e) => {
-                e.preventDefault();
-                handleTeamToggle(team);
-              }}
-              className="px-3 py-2 text-sm pl-8"
-            >
-              {team}
-            </DropdownMenuCheckboxItem>
-          ))}
-          
-          {selectedTeams.map(team => 
-            !localTeams.includes(team) && (
+          {localTeams.map((team) => {
+            const teamKey = typeof team === 'string' ? team : (team.id || team.name);
+            const displayName = typeof team === 'string' ? team : team.name;
+            const isChecked = selectedTeams.some(t => (typeof t === 'string' ? t === teamKey : (t.id ? t.id === teamKey : t.name === teamKey)));
+            return (
               <DropdownMenuCheckboxItem
-                key={team}
+                key={teamKey}
+                checked={isChecked}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  handleTeamToggle(team);
+                }}
+                className="px-3 py-2 text-sm pl-8"
+              >
+                {displayName}
+              </DropdownMenuCheckboxItem>
+            );
+          })}
+          
+          {selectedTeams.map(team => {
+            const teamKey = typeof team === 'string' ? team : (team.id || team.name);
+            const existsInLocal = localTeams.some(t => (typeof t === 'string' ? t === teamKey : (t.id ? t.id === teamKey : t.name === teamKey)));
+            if (existsInLocal) return null;
+            const displayName = typeof team === 'string' ? team : team.name;
+            return (
+              <DropdownMenuCheckboxItem
+                key={teamKey}
                 checked={true}
                 onSelect={(e) => {
                   e.preventDefault();
@@ -136,10 +166,10 @@ export function TeamFilter({ selectedTeams, onTeamSelect, availableTeams }: Team
                 }}
                 className="px-3 py-2 text-sm text-blue-600 pl-8"
               >
-                {team} (custom)
+                {displayName} (custom)
               </DropdownMenuCheckboxItem>
-            )
-          )}
+            );
+          })}
         </div>
 
         {/* Add New Team Member */}

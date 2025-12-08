@@ -545,8 +545,18 @@ export function FeatureDetailsPage({
   const handleInputChange = (field: keyof Feature, value: any) => {
     setDraftFeature((prev) => {
       if (!prev) return null;
-      
-      const updatedDraft = { ...prev, [field]: value };
+      let updatedDraft: any = { ...prev };
+      if (field === 'team') {
+        if (typeof value === 'string') {
+          updatedDraft.team = value;
+          updatedDraft.team_id = null;
+        } else if (value && typeof value === 'object') {
+          updatedDraft.team = value.name;
+          updatedDraft.team_id = value.id || null;
+        }
+      } else {
+        updatedDraft = { ...prev, [field]: value };
+      }
       
       // Automatically update status based on progress
       if (field === 'progress') {
@@ -615,6 +625,7 @@ export function FeatureDetailsPage({
         status: draftFeature.status || null,
         progress: draftFeature.progress || null,
         team: draftFeature.team || null,
+        team_id: draftFeature.team_id || null,
         days: draftFeature.days || null,
         startdate: draftFeature.startdate || null,
         targetdate: draftFeature.targetdate || null,

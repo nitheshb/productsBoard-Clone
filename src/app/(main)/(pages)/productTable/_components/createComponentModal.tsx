@@ -43,6 +43,7 @@ export function CreateComponentModal({
     version: "1.0.0",
     status: "Todo", // Added status field
     team: "", // Added team field
+    team_id: null as string | null,
     product_id: productId,
     startDate: null,
     targetDate: null,
@@ -322,8 +323,14 @@ export function CreateComponentModal({
               <span className="text-gray-500 w-24">Team</span>
               <div className="relative w-full">
                 <TeamDropdown
-                  value={formData.team || ""}
-                  onChange={(value) => setFormData(prev => ({ ...prev, team: value }))}
+                    value={formData.team || ""}
+                    onChange={(value) => {
+                      if (typeof value === 'string') {
+                        setFormData(prev => ({ ...prev, team: value, team_id: null }));
+                      } else {
+                        setFormData(prev => ({ ...prev, team: value.name, team_id: value.id || null }));
+                      }
+                    }}
                   placeholder="Select or add team member"
                   className="w-full"
                   disabled={loading}

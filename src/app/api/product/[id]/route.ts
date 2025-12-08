@@ -53,7 +53,7 @@ export async function GET(
     if (componentsError) throw componentsError;
 
     // Fetch features for all components of this product
-    const componentIds = components.map(comp => comp.id);
+    const componentIds = components.map((comp: any) => comp.id);
     let features = [];
 
     if (componentIds.length > 0) {
@@ -67,8 +67,8 @@ export async function GET(
     }
 
     // Structure the data hierarchically
-    const componentsWithFeatures = components.map(component => {
-      const componentFeatures = features.filter(feature => feature.component_id === component.id);
+    const componentsWithFeatures = components.map((component: any) => {
+      const componentFeatures = features.filter((feature: any) => feature.component_id === component.id);
       return {
         ...component,
         features: componentFeatures
@@ -125,6 +125,7 @@ export async function PUT(
     if (body.progress !== undefined) updateFields.progress = body.progress;
     if (body.version !== undefined) updateFields.version = body.version;
     if (body.team !== undefined) updateFields.team = body.team;
+    if (body.team_id !== undefined) updateFields.team_id = body.team_id;
     if (body.days !== undefined) updateFields.days = body.days;
     if (body.startDate !== undefined || body.startdate !== undefined) {
       updateFields.startdate = body.startDate || body.startdate;

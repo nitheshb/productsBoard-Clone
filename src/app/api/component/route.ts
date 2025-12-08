@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         status: componentData.status || null,
         progress: componentData.progress !== undefined ? componentData.progress : null,
         team: componentData.team || null,
+        team_id: componentData.team_id || null,
         days: componentData.days !== undefined ? componentData.days : null,
         startdate: componentData.startDate || null,
         targetdate: componentData.targetDate || null,
