@@ -29,6 +29,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
     progress: 0,
     version: '1.0.0',
     team: '', // Added team field
+    team_id: null as string | null,
     description: '',
   });
   const [loading, setLoading] = useState(false);
@@ -46,6 +47,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
             progress: data.progress || 0,
             version: data.version || '1.0.0',
             team: data.team || '', // Fetch team
+            team_id: data.team_id ?? null,
             description: data.description || '',
           });
         })
@@ -57,6 +59,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
         progress: 0,
         version: '1.0.0',
         team: '', // Reset team
+        team_id: null,
         description: '',
       });
     }
@@ -125,6 +128,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
           progress: 0,
           version: '1.0.0',
           team: '', // Reset team
+          team_id: null,
           description: '',
         });
       }
@@ -210,8 +214,14 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
             <div>
               <Label htmlFor="team">Team</Label>
               <TeamDropdown
-                value={formData.team || ""}
-                onChange={(value) => setFormData(prev => ({ ...prev, team: value }))}
+                  value={formData.team || ""}
+                  onChange={(value) => {
+                    if (typeof value === 'string') {
+                      setFormData(prev => ({ ...prev, team: value, team_id: null }));
+                    } else {
+                      setFormData(prev => ({ ...prev, team: value.name, team_id: value.id || null }));
+                    }
+                  }}
                 placeholder="Select or add team member"
                 className="mt-1"
                 disabled={loading}

@@ -17,7 +17,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { MultiTaskItem, TaskType } from "@/app/types";
-import { fetchExistingTeamMembers } from '@/utils/teamUtils';
+import { fetchExistingTeamMembers, TeamMember } from '@/utils/teamUtils';
 
 interface CreateFeatureModalProps {
   isOpen: boolean;
@@ -82,6 +82,7 @@ export function CreateFeatureModal({
     status: "Todo",
     progress: 0,
     team: "",
+    team_id: null as string | null,
     days: null,
     startdate: null,
     targetdate: null,
@@ -100,15 +101,15 @@ export function CreateFeatureModal({
   const [selectedTaskType, setSelectedTaskType] = useState<string>('');
   const [selectedSubTaskTypes, setSelectedSubTaskTypes] = useState<string[]>([]);
   const [taskItems, setTaskItems] = useState<MultiTaskItem[]>([]);
-  const [availableTeams, setAvailableTeams] = useState<string[]>([]);
-  const [selectedTeamForTask, setSelectedTeamForTask] = useState<{[key: string]: string}>({});
+  const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
+  const [selectedTeamForTask, setSelectedTeamForTask] = useState<{[key: string]: string | TeamMember}>({});
 
   // Fetch available teams
   React.useEffect(() => {
     const fetchTeams = async () => {
       try {
         const teamMembers = await fetchExistingTeamMembers();
-        setAvailableTeams(teamMembers.map(member => member.name));
+        setAvailableTeams(teamMembers);
       } catch (error) {
         console.error('Error fetching teams:', error);
       }
@@ -149,6 +150,7 @@ export function CreateFeatureModal({
           status: 'Todo',
           progress: 0,
           team: '',
+          team_id: null,
           days: null,
           startdate: null,
           targetdate: null,
@@ -173,6 +175,7 @@ export function CreateFeatureModal({
         status: "Todo",
         progress: 0,
         team: "",
+        team_id: null,
         days: null,
         startdate: null,
         targetdate: null,
@@ -198,19 +201,20 @@ export function CreateFeatureModal({
       fetch(`/api/features/${featureId}`)
         .then(res => res.json())
         .then(data => {
-          setFormData({
-            name: data.name || "",
-            status: data.status || "Todo",
-            progress: data.progress || 0,
-            team: data.team || "",
-            days: data.days ?? null,
-            startdate: data.startdate || null,
-            targetdate: data.targetdate || null,
-            completedon: data.completedon || null,
-            remarks: data.remarks || "",
-            description: data.description || "",
-            version: data.version || "1.0.0",
-          });
+              setFormData({
+                name: data.name || "",
+                status: data.status || "Todo",
+                progress: data.progress || 0,
+                team: data.team || "",
+                team_id: data.team_id ?? null,
+                days: data.days ?? null,
+                startdate: data.startdate || null,
+                targetdate: data.targetdate || null,
+                completedon: data.completedon || null,
+                remarks: data.remarks || "",
+                description: data.description || "",
+                version: data.version || "1.0.0",
+              });
         })
         .finally(() => setLoading(false));
     }
@@ -261,6 +265,7 @@ export function CreateFeatureModal({
       status: "Todo",
       progress: 0,
       team: "",
+      team_id: null,
       days: null,
       startdate: null,
       targetdate: null,
@@ -283,6 +288,7 @@ export function CreateFeatureModal({
       status: "Todo",
       progress: 0,
       team: "",
+      team_id: null,
       days: null,
       startdate: null,
       targetdate: null,
@@ -450,6 +456,7 @@ export function CreateFeatureModal({
         status: "Todo",
         progress: 0,
         team: "",
+        team_id: null,
         days: null,
         startdate: null,
         targetdate: null,
@@ -519,11 +526,20 @@ export function CreateFeatureModal({
       {/* Team */}
       <div className="flex items-center gap-1">
         <span className="text-[#30363c] w-24 text-[14px] min-h-[32px] py-2 capitalize min-w-[100px] max-w-[140px] mr-5">Team</span>
-        <TeamFilter
-          selectedTeams={formData.team ? [formData.team] : []}
-          availableTeams={availableTeams}
-          onTeamSelect={(teams) => setFormData(prev => ({ ...prev, team: teams[0] || "" }))}
-        />
+                <TeamFilter
+                  selectedTeams={formData.team ? [formData.team] : []}
+                  availableTeams={availableTeams}
+                  onTeamSelect={(teams) => {
+                    const first = teams[0];
+                    if (!first) {
+                      setFormData(prev => ({ ...prev, team: "", team_id: null }));
+                    } else if (typeof first === 'string') {
+                      setFormData(prev => ({ ...prev, team: first, team_id: null }));
+                    } else {
+                      setFormData(prev => ({ ...prev, team: first.name, team_id: first.id || null }));
+                    }
+                  }}
+                />
       </div>
 
       {/* Days */}
@@ -781,12 +797,21 @@ export function CreateFeatureModal({
                             selectedTeams={selectedTeamForTask[taskItem.sub_task_type] ? [selectedTeamForTask[taskItem.sub_task_type]] : []}
                             availableTeams={availableTeams}
                             onTeamSelect={(teams) => {
-                              const team = teams[0] || '';
+                              const first = teams[0];
                               setSelectedTeamForTask(prev => ({
                                 ...prev,
-                                [taskItem.sub_task_type]: team
+                                [taskItem.sub_task_type]: first || ''
                               }));
-                              updateTaskItem(taskItem.sub_task_type, 'team', team || null);
+                              if (!first) {
+                                updateTaskItem(taskItem.sub_task_type, 'team', null);
+                                updateTaskItem(taskItem.sub_task_type, 'team_id', null);
+                              } else if (typeof first === 'string') {
+                                updateTaskItem(taskItem.sub_task_type, 'team', first);
+                                updateTaskItem(taskItem.sub_task_type, 'team_id', null);
+                              } else {
+                                updateTaskItem(taskItem.sub_task_type, 'team', first.name);
+                                updateTaskItem(taskItem.sub_task_type, 'team_id', first.id || null);
+                              }
                             }}
                           />
                         </div>

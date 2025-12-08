@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         status: featureData.status || 'Todo',
         progress: featureData.progress !== undefined ? featureData.progress : 0,
         team: featureData.team || null,
+        team_id: featureData.team_id || null,
         days: featureData.days !== undefined ? featureData.days : null,
         startdate: featureData.startdate || null,
         targetdate: featureData.targetdate || null,
