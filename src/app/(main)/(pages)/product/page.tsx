@@ -7,14 +7,14 @@ import ProductDropdown from '@/app/(main)/(pages)/productDropdown/ProductDropdow
 import Sidebar from './_components/sidebar';
 import { supabase } from '@/lib/supabaseClient';
 import { FilterContainer } from '@/components/filters/filtercontainer';
-import { fetchExistingTeamMembers, teamEventEmitter } from '@/utils/teamUtils';
+import { fetchExistingTeamMembers, teamEventEmitter, TeamMember } from '@/utils/teamUtils';
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
     
     // Filter states
-    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+    const [selectedTeams, setSelectedTeams] = useState<Array<string | TeamMember>>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
     const [selectedTaskTypes, setSelectedTaskTypes] = useState<string[]>([]);
@@ -22,7 +22,7 @@ export default function Home() {
     const [endDate, setEndDate] = useState<Date | undefined>(undefined);
     
     // Available filter options (will be fetched from database)
-    const [availableTeams, setAvailableTeams] = useState<string[]>([]);
+    const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
     const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
     const [availableVersions, setAvailableVersions] = useState<string[]>([]);
     const [availableTaskTypes, setAvailableTaskTypes] = useState<string[]>([]);
@@ -35,7 +35,8 @@ export default function Home() {
             try {
                 // Fetch team members using the real-time system
                 const teamMembers = await fetchExistingTeamMembers();
-                setAvailableTeams(teamMembers.map(member => member.name));
+                // Store full TeamMember objects so we can preserve ids if available
+                setAvailableTeams(teamMembers);
                 
                 // Fetch unique status values from database
                 const { data: statusData, error: statusError } = await supabase
@@ -77,7 +78,8 @@ export default function Home() {
     useEffect(() => {
         const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
             setAvailableTeams(prev => {
-                if (!prev.includes(teamName)) {
+                const exists = prev.some(t => (typeof t === 'string' ? t === teamName : t.name === teamName));
+                if (!exists) {
                     return [...prev, teamName];
                 }
                 return prev;
@@ -91,7 +93,7 @@ export default function Home() {
         setSelectedProductIds(productIds);
     };
 
-    const handleTeamSelect = (teams: string[]) => {
+    const handleTeamSelect = (teams: Array<string | TeamMember>) => {
         setSelectedTeams(teams);
     };
 
@@ -162,7 +164,7 @@ export default function Home() {
                 <div className="bg-gray-100">
                     <ProductTable 
                         selectedProductIds={selectedProductIds}
-                        teamFilter={selectedTeams}
+                        teamFilter={selectedTeams.map(team => typeof team === 'string' ? team : team.name)}
                         statusFilter={selectedStatuses}
                         versionFilter={selectedVersions}
                         taskTypeFilter={selectedTaskTypes}
