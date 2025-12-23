@@ -82,6 +82,7 @@ export function CreateComponentModal({
             version: data.version || "1.0.0",
             status: data.status || "Todo", // Fetch status
             team: data.team || "", // Fetch team
+            team_id: data.team_id || null,
             product_id: data.product_id || productId,
             startDate: data.startDate || null,
             targetDate: data.targetDate || null,
@@ -97,6 +98,7 @@ export function CreateComponentModal({
         version: "1.0.0",
         status: "Todo", // Default status for new component
         team: "", // Default team for new component
+        team_id: null,
         product_id: productId,
         startDate: null,
         targetDate: null,
@@ -189,6 +191,7 @@ export function CreateComponentModal({
           version: "1.0.0",
           status: "Todo", // Reset status
           team: "", // Reset team
+          team_id: null,
           product_id: formData.product_id,
           startDate: null,
           targetDate: null,
@@ -210,6 +213,7 @@ export function CreateComponentModal({
       version: "1.0.0",
       status: "Todo", // Reset status
       team: "", // Reset team
+      team_id: null,
       product_id: productId,
       startDate: null,
       targetDate: null,
