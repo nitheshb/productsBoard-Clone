@@ -28,19 +28,219 @@ interface Task {
   created_at: string;
 }
 
-interface EmployeeBoardProps {
-  currentWeek: Date;
-  setCurrentWeek: (date: Date) => void;
-  teamMembers: TeamMember[];
-  tasks: Task[];
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  visibleDays: number[];
-  setVisibleDays: (days: number[]) => void;
-  onTaskClick: (taskId: string) => void;
+interface Product {
+  id: string;
+  name: string;
 }
 
-const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, searchQuery, setSearchQuery, visibleDays, setVisibleDays, onTaskClick }: EmployeeBoardProps) => {
+export default function CalendarPage() {
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleDays, setVisibleDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default to weekdays
+
+  // Product filter state
+  const [selectedProductId, setSelectedProductId] = useState<string>('all');
+  const [availableProducts, setAvailableProducts] = useState<Array<{id: string, name: string}>>([]);
+
+  interface Product {
+    id: string;
+    name: string;
+  }
+
+  // Modal state
+  const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string>('');
+
+  // Fetch available products
+  const fetchProducts = async () => {
+    try {
+      const { data: productsData, error } = await supabase
+        .from('pb_products')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+
+      setAvailableProducts(productsData || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+      }, 10000); // 10 second timeout
+      
+      try {
+        // Fetch actual team names from the database
+        const { data: teamData, error: teamError } = await supabase
+          .from('pb_features')
+          .select('team')
+          .not('team', 'is', null);
+
+        if (teamError) throw teamError;
+
+        // Get unique team names from database
+        const uniqueTeams = [...new Set(teamData.map(item => item.team).filter(Boolean))];
+        
+        // Create team members from actual team names in database
+        const teamMembers: TeamMember[] = uniqueTeams.map((team: string, index: number) => {
+          const initials = team.split(' ').map((word: string) => word.charAt(0)).join('').toUpperCase();
+          return {
+            id: (index + 1).toString(),
+            name: team,
+            role: 'Developer',
+            initials: initials,
+            team: team
+          };
+        });
+
+        // Sort team members alphabetically by name
+        const sortedTeamMembers = teamMembers.sort((a, b) => a.name.localeCompare(b.name));
+        setTeamMembers(sortedTeamMembers);
+
+        // Fetch tasks from features table
+        const { data: allTaskData, error: fetchError } = await supabase
+          .from('pb_features')
+          .select(`
+            id, name, description, team, startdate, targetdate, status, created_at,
+            component:component_id (
+              id,
+              name,
+              product_id,
+              product:product_id (
+                id,
+                name
+              )
+            )
+          `)
+          .not('team', 'is', null);
+
+        if (fetchError) throw fetchError;
+
+        // Apply product filter in JavaScript if a specific product is selected
+        let filteredTaskData = allTaskData;
+        if (selectedProductId !== 'all') {
+          filteredTaskData = allTaskData?.filter(task =>
+            (task.component as any)?.product_id === selectedProductId
+          ) || [];
+        }
+
+        // Format tasks from database
+        const formattedTasks: Task[] = filteredTaskData && filteredTaskData.length > 0
+          ? filteredTaskData
+              .filter(task => task.startdate && task.targetdate) // Only include tasks with both dates
+              .map(task => ({
+                id: task.id,
+                name: task.name,
+                description: task.description || '',
+                estimatedTime: '4h', // Default estimated time
+                status: task.status || 'Todo',
+                startDate: task.startdate,
+                targetDate: task.targetdate,
+                color: 'blue', // Default color since it's not in database
+                team: task.team,
+                created_at: task.created_at || new Date().toISOString()
+              }))
+          : [];
+
+        // Sort tasks alphabetically by name
+        const sortedTasks = formattedTasks.sort((a, b) => a.name.localeCompare(b.name));
+        setTasks(sortedTasks);
+        clearTimeout(timeoutId);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Set empty arrays on error to prevent infinite loading
+        setTeamMembers([]);
+        setTasks([]);
+        clearTimeout(timeoutId);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedProductId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto bg-white">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading calendar...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (teamMembers.length === 0) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto bg-white">
+          <div className="max-w-8xl mx-auto">
+            <header className="flex justify-between items-center p-4 bg-white border-b">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-6 w-6 text-blue-500" />
+                <h1 className="text-xl font-semibold">Dev Calendar</h1>
+              </div>
+            </header>
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <CalendarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-600 mb-2">No Team Members Found</h2>
+                <p className="text-gray-500">Create some features with team assignments to see the calendar.</p>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Handle task click to open feature details
+  const handleTaskClick = (taskId: string) => {
+    setSelectedFeatureId(taskId);
+    setIsFeatureDetailOpen(true);
+  };
+
+  // Handle feature update
+  const handleFeatureUpdated = () => {
+    // Refresh the tasks data
+    // This will trigger a re-fetch of tasks in the useEffect
+    window.location.reload();
+  };
+
+  // Handle feature deletion
+  const handleFeatureDeleted = () => {
+    setIsFeatureDetailOpen(false);
+    setSelectedFeatureId('');
+    // Refresh the tasks data
+    window.location.reload();
+  };
+
+  // Handle close feature details
+  const handleCloseFeatureDetails = () => {
+    setIsFeatureDetailOpen(false);
+    setSelectedFeatureId('');
+  };
+
+  // Helper functions from EmployeeBoard
   const getWeekDates = (date: Date) => {
     const startOfWeek = new Date(date);
     const day = startOfWeek.getDay();
@@ -55,10 +255,6 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
     }
     return weekDates;
   };
-
-  const weekDates = getWeekDates(currentWeek);
-  const weekStart = weekDates[0];
-  const weekEnd = weekDates[6];
 
   const formatDateRange = (start: Date, end: Date) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -90,10 +286,21 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
     }).sort((a, b) => a.name.localeCompare(b.name)); // Sort tasks alphabetically
   };
 
-  // Filter team members based on search query
-  const filteredTeamMembers = teamMembers.filter(member => 
-    member.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter team members based on search query and selected product
+  const filteredTeamMembers = teamMembers.filter(member => {
+    // First check search query
+    const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // If a specific product is selected, check if this team member has tasks for that product
+    if (selectedProductId !== 'all') {
+      // Get unique teams from filtered tasks
+      const teamsInFilteredTasks = [...new Set(tasks.map(task => task.team))];
+      const hasTasksForProduct = teamsInFilteredTasks.includes(member.team);
+      return matchesSearch && hasTasksForProduct;
+    }
+
+    return matchesSearch;
+  });
 
   const getTaskColor = (status: string) => {
     const statusColorMap: { [key: string]: string } = {
@@ -108,7 +315,12 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
     return statusColorMap[status] || 'bg-gray-100 border-gray-300 text-gray-700';
   };
 
+  const weekDates = getWeekDates(currentWeek);
+  const weekStart = weekDates[0];
+  const weekEnd = weekDates[6];
+
   return (
+    <>
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-white">
@@ -119,7 +331,7 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
               <CalendarIcon className="h-6 w-6 text-blue-500" />
               <h1 className="text-xl font-semibold">Dev Calendar</h1>
             </div>
-            
+
             {/* Search Bar */}
             <div className="flex-1 max-w-md mx-8">
               <div className="relative">
@@ -132,6 +344,22 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+            </div>
+
+            {/* Product Filter Dropdown */}
+            <div className="flex items-center gap-4 mr-8">
+              <select
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">All Products</option>
+                {availableProducts.map((product: Product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </select>
             </div>
             
             <div className="flex items-center gap-4">
@@ -222,8 +450,8 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
                             {dayTasks.map((task) => (
                               <div
                                 key={task.id}
-                                className={`p-2 rounded border text-xs cursor-pointer hover:opacity-80 transition-opacity ${getTaskColor(task.status)}`}
-                                onClick={() => onTaskClick(task.id)}
+                                  className={`p-2 rounded border text-xs cursor-pointer hover:opacity-80 transition-opacity ${getTaskColor(task.status)}`}
+                                  onClick={() => handleTaskClick(task.id)}
                               >
                                 <div className="font-medium">{task.name}</div>
                                 <div className="text-xs opacity-75">{task.description}</div>
@@ -244,227 +472,6 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
         </div>
       </main>
     </div>
-  );
-};
-
-export default function CalendarPage() {
-  const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [visibleDays, setVisibleDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default to weekdays
-
-  // Modal state
-  const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
-  const [selectedFeatureId, setSelectedFeatureId] = useState<string>('');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      // Add timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        setIsLoading(false);
-      }, 10000); // 10 second timeout
-      
-      try {
-        // Fetch actual team names from the database
-        const { data: teamData, error: teamError } = await supabase
-          .from('pb_features')
-          .select('team')
-          .not('team', 'is', null);
-
-        if (teamError) throw teamError;
-
-        // Get unique team names from database
-        const uniqueTeams = [...new Set(teamData.map(item => item.team).filter(Boolean))];
-        
-        // Create team members from actual team names in database
-        const teamMembers: TeamMember[] = uniqueTeams.map((team: string, index: number) => {
-          const initials = team.split(' ').map((word: string) => word.charAt(0)).join('').toUpperCase();
-          return {
-            id: (index + 1).toString(),
-            name: team,
-            role: 'Developer',
-            initials: initials,
-            team: team
-          };
-        });
-
-        // Sort team members alphabetically by name
-        const sortedTeamMembers = teamMembers.sort((a, b) => a.name.localeCompare(b.name));
-        setTeamMembers(sortedTeamMembers);
-
-        // Fetch tasks from features table
-        const { data: taskData, error: taskError } = await supabase
-          .from('pb_features')
-          .select('id, name, description, team, startdate, targetdate, status, created_at')
-          .not('team', 'is', null);
-
-        if (taskError) throw taskError;
-
-        // Format tasks from database
-        // Create sample tasks with proper date ranges for demonstration
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dayAfterTomorrow = new Date(today);
-        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-        const threeDaysFromNow = new Date(today);
-        threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-        
-        const sampleTasks: Task[] = [
-          {
-            id: '1',
-            name: 'User Authentication',
-            description: 'Implement login and registration',
-            estimatedTime: '4h',
-            status: 'In Progress',
-            startDate: today.toISOString(),
-            targetDate: dayAfterTomorrow.toISOString(), // 3-day span
-            color: 'yellow',
-            team: uniqueTeams[0] || 'Sharuk',
-            created_at: today.toISOString()
-          },
-          {
-            id: '2',
-            name: 'API Development',
-            description: 'Create REST API endpoints',
-            estimatedTime: '6h',
-            status: 'Completed',
-            startDate: tomorrow.toISOString(),
-            targetDate: threeDaysFromNow.toISOString(), // 3-day span
-            color: 'green',
-            team: uniqueTeams[1] || 'Jignesh',
-            created_at: today.toISOString()
-          },
-          {
-            id: '3',
-            name: 'Database Design',
-            description: 'Design and implement database schema',
-            estimatedTime: '3h',
-            status: 'Todo',
-            startDate: today.toISOString(),
-            targetDate: tomorrow.toISOString(), // 2-day span
-            color: 'gray',
-            team: uniqueTeams[2] || 'Nithesh',
-            created_at: today.toISOString()
-          }
-        ];
-
-        const formattedTasks: Task[] = taskData.length > 0 ? taskData
-          .filter(task => task.startdate && task.targetdate) // Only include tasks with both dates
-          .map(task => ({
-            id: task.id,
-            name: task.name,
-            description: task.description || '',
-            estimatedTime: '4h', // Default estimated time
-            status: task.status || 'Todo',
-            startDate: task.startdate,
-            targetDate: task.targetdate,
-            color: 'blue', // Default color since it's not in database
-            team: task.team,
-            created_at: task.created_at || new Date().toISOString()
-          })) : sampleTasks;
-
-        // Sort tasks alphabetically by name
-        const sortedTasks = formattedTasks.sort((a, b) => a.name.localeCompare(b.name));
-        setTasks(sortedTasks);
-        clearTimeout(timeoutId);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        // Set empty arrays on error to prevent infinite loading
-        setTeamMembers([]);
-        setTasks([]);
-        clearTimeout(timeoutId);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-white">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading calendar...</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (teamMembers.length === 0) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-white">
-          <div className="max-w-8xl mx-auto">
-            <header className="flex justify-between items-center p-4 bg-white border-b">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-6 w-6 text-blue-500" />
-                <h1 className="text-xl font-semibold">Dev Calendar</h1>
-              </div>
-            </header>
-            <div className="flex items-center justify-center h-96">
-              <div className="text-center">
-                <CalendarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-600 mb-2">No Team Members Found</h2>
-                <p className="text-gray-500">Create some features with team assignments to see the calendar.</p>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Handle task click to open feature details
-  const handleTaskClick = (taskId: string) => {
-    setSelectedFeatureId(taskId);
-    setIsFeatureDetailOpen(true);
-  };
-
-  // Handle feature update
-  const handleFeatureUpdated = () => {
-    // Refresh the tasks data
-    // This will trigger a re-fetch of tasks in the useEffect
-    window.location.reload();
-  };
-
-  // Handle feature deletion
-  const handleFeatureDeleted = () => {
-    setIsFeatureDetailOpen(false);
-    setSelectedFeatureId('');
-    // Refresh the tasks data
-    window.location.reload();
-  };
-
-  // Handle close feature details
-  const handleCloseFeatureDetails = () => {
-    setIsFeatureDetailOpen(false);
-    setSelectedFeatureId('');
-  };
-
-  return (
-    <>
-      <EmployeeBoard
-        currentWeek={currentWeek}
-        setCurrentWeek={setCurrentWeek}
-        teamMembers={teamMembers}
-        tasks={tasks}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        visibleDays={visibleDays}
-        setVisibleDays={setVisibleDays}
-        onTaskClick={handleTaskClick}
-      />
 
       {selectedFeatureId && (
         <FeatureDetailsPage
