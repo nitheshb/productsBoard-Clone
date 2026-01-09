@@ -5,6 +5,7 @@ import Sidebar from '@/app/(main)/(pages)/product/_components/sidebar';
 import { supabase } from '@/lib/supabaseClient';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import React from 'react';
+import FeatureDetailsPage from '@/app/(main)/(pages)/productTable/_components/featureDetails';
 
 interface TeamMember {
   id: string;
@@ -36,9 +37,10 @@ interface EmployeeBoardProps {
   setSearchQuery: (query: string) => void;
   visibleDays: number[];
   setVisibleDays: (days: number[]) => void;
+  onTaskClick: (taskId: string) => void;
 }
 
-const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, searchQuery, setSearchQuery, visibleDays, setVisibleDays }: EmployeeBoardProps) => {
+const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, searchQuery, setSearchQuery, visibleDays, setVisibleDays, onTaskClick }: EmployeeBoardProps) => {
   const getWeekDates = (date: Date) => {
     const startOfWeek = new Date(date);
     const day = startOfWeek.getDay();
@@ -220,7 +222,8 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
                             {dayTasks.map((task) => (
                               <div
                                 key={task.id}
-                                className={`p-2 rounded border text-xs ${getTaskColor(task.status)}`}
+                                className={`p-2 rounded border text-xs cursor-pointer hover:opacity-80 transition-opacity ${getTaskColor(task.status)}`}
+                                onClick={() => onTaskClick(task.id)}
                               >
                                 <div className="font-medium">{task.name}</div>
                                 <div className="text-xs opacity-75">{task.description}</div>
@@ -251,6 +254,10 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleDays, setVisibleDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default to weekdays
+
+  // Modal state
+  const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -418,16 +425,56 @@ export default function CalendarPage() {
     );
   }
 
+  // Handle task click to open feature details
+  const handleTaskClick = (taskId: string) => {
+    setSelectedFeatureId(taskId);
+    setIsFeatureDetailOpen(true);
+  };
+
+  // Handle feature update
+  const handleFeatureUpdated = () => {
+    // Refresh the tasks data
+    // This will trigger a re-fetch of tasks in the useEffect
+    window.location.reload();
+  };
+
+  // Handle feature deletion
+  const handleFeatureDeleted = () => {
+    setIsFeatureDetailOpen(false);
+    setSelectedFeatureId('');
+    // Refresh the tasks data
+    window.location.reload();
+  };
+
+  // Handle close feature details
+  const handleCloseFeatureDetails = () => {
+    setIsFeatureDetailOpen(false);
+    setSelectedFeatureId('');
+  };
+
   return (
-    <EmployeeBoard 
-      currentWeek={currentWeek}
-      setCurrentWeek={setCurrentWeek}
-      teamMembers={teamMembers}
-      tasks={tasks}
-      searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
-      visibleDays={visibleDays}
-      setVisibleDays={setVisibleDays}
-    />
+    <>
+      <EmployeeBoard
+        currentWeek={currentWeek}
+        setCurrentWeek={setCurrentWeek}
+        teamMembers={teamMembers}
+        tasks={tasks}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        visibleDays={visibleDays}
+        setVisibleDays={setVisibleDays}
+        onTaskClick={handleTaskClick}
+      />
+
+      {selectedFeatureId && (
+        <FeatureDetailsPage
+          featureId={selectedFeatureId}
+          isOpen={isFeatureDetailOpen}
+          onClose={handleCloseFeatureDetails}
+          onFeatureUpdated={handleFeatureUpdated}
+          onFeatureDeleted={handleFeatureDeleted}
+        />
+      )}
+    </>
   );
 }
