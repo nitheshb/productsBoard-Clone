@@ -1674,29 +1674,29 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </TableCell>
           )}
           {visibleColumns.progress && (
-            <TableCell className="w-[90px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <div className="flex items-center justify-center" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
-                <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 transform -rotate-90" viewBox="0 0 36 36">
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+            <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              <div className="flex items-center justify-center overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+                <div className="relative w-7 h-7 overflow-visible">
+                  <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="18"
                       fill="none"
                       stroke="#e5e7eb"
-                      strokeWidth="2"
+                      strokeWidth="10"
                     />
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="18"
                       fill="none"
                       stroke={getProgressColor(getProgressValue(child))}
-                      strokeWidth="2"
-                      strokeDasharray={`${getProgressValue(child)}, 100`}
+                      strokeWidth="10"
+                      strokeDasharray={`${(getProgressValue(child) / 100) * 113.04}, 113.04`}
+                      strokeLinecap="round"
                     />
                   </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[10px] font-medium">
-                      {getProgressValue(child)}%
-                    </span>
-                  </div>
                 </div>
               </div>
             </TableCell>
@@ -2298,11 +2298,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
 
   // Helper function to get progress color based on percentage
   const getProgressColor = (progress: number): string => {
-    if (progress === 100) return '#22c55e'; // Green for 100%
-    if (progress >= 75) return '#2563eb'; // Blue for 75-99%
-    if (progress >= 50) return '#eab308'; // Yellow for 50-74%
-    if (progress >= 25) return '#f97316'; // Orange for 25-49%
-    return '#ef4444'; // Red for 0-24%
+    if (progress === 100) return '#16a34a'; // Bright green for 100%
+    if (progress >= 75) return '#3b82f6'; // Bright blue for 75-99%
+    if (progress >= 50) return '#f59e0b'; // Bright amber for 50-74%
+    if (progress >= 25) return '#ea580c'; // Bright orange for 25-49%
+    return '#dc2626'; // Bright red for 0-24%
   };
 
 
@@ -2524,7 +2524,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                   </TableHead>
                 )}
                 {visibleColumns.progress && (
-                  <TableHead className="w-[90px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                  <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
                     Progress
                   </TableHead>
                 )}
@@ -2702,29 +2702,29 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                       </TableCell>
                     )}
                     {visibleColumns.progress && (
-                      <TableCell className="w-[90px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        <div className="flex items-center justify-center" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
-                          <div className="relative w-10 h-10">
-                            <svg className="w-10 h-10 transform -rotate-90" viewBox="0 0 36 36">
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        <div className="flex items-center justify-center overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
+                          <div className="relative w-7 h-7 overflow-visible">
+                            <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
                                 fill="none"
                                 stroke="#e5e7eb"
-                                strokeWidth="2"
+                                strokeWidth="10"
                               />
-                              <path
-                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
                                 fill="none"
                                 stroke={getProgressColor(getProgressValue(item))}
-                                strokeWidth="2"
-                                strokeDasharray={`${getProgressValue(item)}, 100`}
+                                strokeWidth="10"
+                                strokeDasharray={`${(getProgressValue(item) / 100) * 113.04}, 113.04`}
+                                strokeLinecap="round"
                               />
                             </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-[10px] font-medium">
-                                {getProgressValue(item)}%
-                              </span>
-                            </div>
                           </div>
                         </div>
                       </TableCell>
