@@ -1698,7 +1698,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     />
                   </svg>
                 </div>
-                <span className="text-xs font-medium">
+                <span className="text-xs font-medium w-8 text-left">
                   {getProgressValue(child)}%
                 </span>
               </div>
@@ -2301,11 +2301,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
 
   // Helper function to get progress color based on percentage
   const getProgressColor = (progress: number): string => {
-    if (progress === 100) return '#16a34a'; // Bright green for 100%
-    if (progress >= 75) return '#3b82f6'; // Bright blue for 75-99%
-    if (progress >= 50) return '#f59e0b'; // Bright amber for 50-74%
-    if (progress >= 25) return '#ea580c'; // Bright orange for 25-49%
-    return '#dc2626'; // Bright red for 0-24%
+    if (progress === 100) return '#059669'; // Emerald-600: Complete success (green)
+    if (progress >= 76) return '#2563eb'; // Blue-600: Almost there (76-99%)
+    if (progress >= 51) return '#7c3aed'; // Violet-600: Good progress (51-75%)
+    if (progress >= 26) return '#d97706'; // Amber-600: Moderate progress (26-50%)
+    return '#dc2626'; // Red-600: Needs attention (0-25%)
   };
 
 
@@ -2729,7 +2729,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                               />
                             </svg>
                           </div>
-                          <span className="text-xs font-medium">
+                          <span className="text-xs font-medium w-8 text-left">
                             {getProgressValue(item)}%
                           </span>
                         </div>
