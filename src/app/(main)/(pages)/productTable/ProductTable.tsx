@@ -1675,7 +1675,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
           )}
           {visibleColumns.progress && (
             <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <div className="flex items-center justify-center overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+              <div className="flex items-center justify-center gap-2 overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
                 <div className="relative w-7 h-7 overflow-visible">
                   <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
                     <circle
@@ -1684,7 +1684,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                       r="18"
                       fill="none"
                       stroke="#e5e7eb"
-                      strokeWidth="10"
+                      strokeWidth="12"
                     />
                     <circle
                       cx="25"
@@ -1692,12 +1692,15 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                       r="18"
                       fill="none"
                       stroke={getProgressColor(getProgressValue(child))}
-                      strokeWidth="10"
+                      strokeWidth="12"
                       strokeDasharray={`${(getProgressValue(child) / 100) * 113.04}, 113.04`}
                       strokeLinecap="round"
                     />
                   </svg>
                 </div>
+                <span className="text-xs font-medium">
+                  {getProgressValue(child)}%
+                </span>
               </div>
             </TableCell>
           )}
@@ -2703,7 +2706,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     )}
                     {visibleColumns.progress && (
                       <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        <div className="flex items-center justify-center overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
+                        <div className="flex items-center justify-center gap-2 overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
                           <div className="relative w-7 h-7 overflow-visible">
                             <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
                               <circle
@@ -2712,7 +2715,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                                 r="18"
                                 fill="none"
                                 stroke="#e5e7eb"
-                                strokeWidth="10"
+                                strokeWidth="12"
                               />
                               <circle
                                 cx="25"
@@ -2720,12 +2723,15 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                                 r="18"
                                 fill="none"
                                 stroke={getProgressColor(getProgressValue(item))}
-                                strokeWidth="10"
+                                strokeWidth="12"
                                 strokeDasharray={`${(getProgressValue(item) / 100) * 113.04}, 113.04`}
                                 strokeLinecap="round"
                               />
                             </svg>
                           </div>
+                          <span className="text-xs font-medium">
+                            {getProgressValue(item)}%
+                          </span>
                         </div>
                       </TableCell>
                     )}
