@@ -315,36 +315,78 @@ export default function CalendarPage() {
     return statusColorMap[status] || 'bg-gray-100 border-gray-300 text-gray-700';
   };
 
+  // Calculate statistics for a specific date
+  const getDayStats = (date: Date) => {
+    const dayTasks = tasks.filter(task => {
+      if (!task.startDate || !task.targetDate) return false;
+
+      const taskStartDate = new Date(task.startDate);
+      const taskEndDate = new Date(task.targetDate);
+
+      if (isNaN(taskStartDate.getTime()) || isNaN(taskEndDate.getTime())) return false;
+
+      const currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const startDate = new Date(taskStartDate.getFullYear(), taskStartDate.getMonth(), taskStartDate.getDate());
+      const endDate = new Date(taskEndDate.getFullYear(), taskEndDate.getMonth(), taskEndDate.getDate());
+
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+
+    const total = dayTasks.length;
+    const completed = dayTasks.filter(task => task.status === 'Completed').length;
+    const inProgress = dayTasks.filter(task => task.status === 'In Progress').length;
+    const notStarted = dayTasks.filter(task => task.status === 'Todo').length;
+
+    const progressPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      total,
+      completed,
+      inProgress,
+      notStarted,
+      progressPercentage
+    };
+  };
+
+  // Progress color function for day stats (same as circular progress bars)
+  const getProgressColor = (progress: number): string => {
+    if (progress === 100) return '#059669'; // Emerald-600: Complete success (green)
+    if (progress >= 76) return '#2563eb'; // Blue-600: Almost there (76-99%)
+    if (progress >= 51) return '#7c3aed'; // Violet-600: Good progress (51-75%)
+    if (progress >= 26) return '#d97706'; // Amber-600: Moderate progress (26-50%)
+    return '#dc2626'; // Red-600: Needs attention (0-25%)
+  };
+
   const weekDates = getWeekDates(currentWeek);
   const weekStart = weekDates[0];
   const weekEnd = weekDates[6];
 
   return (
     <>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
         <main className="flex-1 bg-white">
           <div className="max-w-8xl mx-auto h-full flex flex-col">
-            {/* Header */}
+          {/* Header */}
             <header className="flex justify-between items-center p-4 bg-white border-b flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-6 w-6 text-blue-500" />
-                <h1 className="text-xl font-semibold">Dev Calendar</h1>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-6 w-6 text-blue-500" />
+              <h1 className="text-xl font-semibold">Dev Calendar</h1>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="flex-1 max-w-md mx-8">
+              <div className="relative">
+                <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search team members..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
-
-              {/* Search Bar */}
-              <div className="flex-1 max-w-md mx-8">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search team members..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+            </div>
 
               {/* Product Filter Dropdown */}
               <div className="flex items-center gap-4 mr-8">
@@ -361,69 +403,111 @@ export default function CalendarPage() {
                   ))}
                 </select>
               </div>
-
-              <div className="flex items-center gap-4">
-                {/* Day Selection Dropdown */}
-                <select
-                  value={visibleDays.join(',')}
-                  onChange={(e) => {
-                    const selectedDays = e.target.value.split(',').map(Number);
-                    setVisibleDays(selectedDays);
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="1,2,3,4,5">Weekdays (Mon-Fri)</option>
-                  <option value="1,2,3,4,5,6">Mon-Sat</option>
-                  <option value="1,2,3,4,5,6,0">Full Week</option>
-                  <option value="1,2,3">Mon-Wed</option>
-                  <option value="4,5">Thu-Fri</option>
-                </select>
-
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                  onClick={() => {
-                    const newWeek = new Date(currentWeek);
-                    newWeek.setDate(newWeek.getDate() - 7);
-                    setCurrentWeek(newWeek);
-                  }}
-                >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                </button>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                  onClick={() => {
-                    const newWeek = new Date(currentWeek);
-                    newWeek.setDate(newWeek.getDate() + 7);
-                    setCurrentWeek(newWeek);
-                  }}
-                >
-                  <ChevronRightIcon className="h-5 w-5" />
-                </button>
-                <span className="text-sm text-gray-600">
-                  {formatDateRange(weekStart, weekEnd)}
-                </span>
-              </div>
-            </header>
+            
+            <div className="flex items-center gap-4">
+              {/* Day Selection Dropdown */}
+              <select
+                value={visibleDays.join(',')}
+                onChange={(e) => {
+                  const selectedDays = e.target.value.split(',').map(Number);
+                  setVisibleDays(selectedDays);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="1,2,3,4,5">Weekdays (Mon-Fri)</option>
+                <option value="1,2,3,4,5,6">Mon-Sat</option>
+                <option value="1,2,3,4,5,6,0">Full Week</option>
+                <option value="1,2,3">Mon-Wed</option>
+                <option value="4,5">Thu-Fri</option>
+              </select>
+              
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-lg"
+                onClick={() => {
+                  const newWeek = new Date(currentWeek);
+                  newWeek.setDate(newWeek.getDate() - 7);
+                  setCurrentWeek(newWeek);
+                }}
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-lg"
+                onClick={() => {
+                  const newWeek = new Date(currentWeek);
+                  newWeek.setDate(newWeek.getDate() + 7);
+                  setCurrentWeek(newWeek);
+                }}
+              >
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+              <span className="text-sm text-gray-600">
+                {formatDateRange(weekStart, weekEnd)}
+              </span>
+            </div>
+          </header>
 
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-auto">
-              <div className="p-4">
-                {/* Calendar Grid */}
+          <div className="p-4">
+            {/* Calendar Grid */}
                 <div className="w-full">
-                  <div className={`grid gap-1 min-w-[800px]`} style={{ gridTemplateColumns: `200px repeat(${visibleDays.length}, 1fr)` }}>
+              <div className={`grid gap-1 min-w-[800px]`} style={{ gridTemplateColumns: `200px repeat(${visibleDays.length}, 1fr)` }}>
                     {/* Header row - Sticky */}
-                    <div className="p-2 font-semibold text-gray-700 bg-white sticky top-0 z-10 border-b-2 border-gray-200">Team Members</div>
+                    <div className="p-2 font-semibold text-gray-700 bg-white sticky top-0 z-10 border-b-2 border-gray-200 min-w-[200px] flex items-center justify-center">Team Members</div>
                 {weekDates.map((date, index) => {
                   const dayOfWeek = date.getDay();
                   if (!visibleDays.includes(dayOfWeek)) return null;
                   
+                  const dayStats = getDayStats(date);
+                  
                   return (
-                    <div key={index} className="p-2 text-center border-b border-r border-gray-200 bg-white sticky top-0 z-10">
+                    <div key={index} className="p-2 border-b border-r border-gray-200 bg-white sticky top-0 z-10 min-w-[200px] flex flex-col items-center">
+                      {/* Date */}
+                      <div className="text-center mb-1">
                       <div className="text-xs font-medium text-gray-500">
                         {date.toLocaleDateString('en', { weekday: 'short' }).toUpperCase()}
                       </div>
                       <div className="text-sm font-semibold text-gray-900">
                         {date.getDate()}
+                        </div>
+                      </div>
+
+                      {/* Statistics in horizontal layout */}
+                      <div className="flex items-center justify-center gap-1 text-[13px] mb-1 flex-wrap">
+                        <span className="text-green-600 font-semibold">✓{dayStats.completed}</span>
+                        <span className="text-gray-400">-</span>
+                        <span className="text-blue-600 font-semibold">⟳{dayStats.inProgress}</span>
+                        <span className="text-gray-400">-</span>
+                        <span className="text-gray-500 font-semibold">○{dayStats.notStarted}</span>
+                        <span className="text-gray-400">-</span>
+                        <span className="text-gray-900 font-bold">Σ{dayStats.total}</span>
+                      </div>
+
+                      {/* Circular Progress Bar - Same as products page */}
+                      <div className="flex justify-center">
+                        <div className="relative w-8 h-8">
+                          <svg className="w-8 h-8 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                            <circle
+                              cx="25"
+                              cy="25"
+                              r="18"
+                              fill="none"
+                              stroke="#e5e7eb"
+                              strokeWidth="10"
+                            />
+                            <circle
+                              cx="25"
+                              cy="25"
+                              r="18"
+                              fill="none"
+                              stroke={getProgressColor(dayStats.progressPercentage)}
+                              strokeWidth="10"
+                              strokeDasharray={`${(dayStats.progressPercentage / 100) * 113.04}, 113.04`}
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </div>
                       </div>
                     </div>
                   );
@@ -471,7 +555,7 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
-          </div>
+            </div>
           </div>
         </main>
       </div>
