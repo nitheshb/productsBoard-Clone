@@ -26,6 +26,15 @@ interface Task {
   color: string;
   team: string;
   created_at: string;
+  pb_components?: {
+    id: string;
+    name: string;
+    product_id: string;
+    pb_products?: {
+      id: string;
+      name: string;
+    };
+  };
 }
 
 interface Product {
@@ -114,11 +123,11 @@ export default function CalendarPage() {
           .from('pb_features')
           .select(`
             id, name, description, team, startdate, targetdate, status, created_at,
-            component:component_id (
+            pb_components!inner (
               id,
               name,
               product_id,
-              product:product_id (
+              pb_products!inner (
                 id,
                 name
               )
@@ -132,7 +141,7 @@ export default function CalendarPage() {
         let filteredTaskData = allTaskData;
         if (selectedProductId !== 'all') {
           filteredTaskData = allTaskData?.filter(task =>
-            (task.component as any)?.product_id === selectedProductId
+            (task.pb_components as any)?.product_id === selectedProductId
           ) || [];
         }
 
@@ -150,8 +159,9 @@ export default function CalendarPage() {
                 targetDate: task.targetdate,
                 color: 'blue', // Default color since it's not in database
                 team: task.team,
-                created_at: task.created_at || new Date().toISOString()
-              }))
+                created_at: task.created_at || new Date().toISOString(),
+                pb_components: task.pb_components
+              } as unknown as Task))
           : [];
 
         // Sort tasks alphabetically by name
@@ -293,9 +303,9 @@ export default function CalendarPage() {
 
     // If a specific product is selected, check if this team member has tasks for that product
     if (selectedProductId !== 'all') {
-      // Get unique teams from filtered tasks
-      const teamsInFilteredTasks = [...new Set(tasks.map(task => task.team))];
-      const hasTasksForProduct = teamsInFilteredTasks.includes(member.team);
+      const hasTasksForProduct = tasks.some(task =>
+        task.team === member.team && (task.pb_components as any)?.product_id === selectedProductId
+      );
       return matchesSearch && hasTasksForProduct;
     }
 
@@ -402,7 +412,7 @@ export default function CalendarPage() {
                     </option>
                   ))}
                 </select>
-              </div>
+            </div>
             
             <div className="flex items-center gap-4">
               {/* Day Selection Dropdown */}
@@ -536,14 +546,24 @@ export default function CalendarPage() {
                             {dayTasks.map((task) => (
                               <div
                                 key={task.id}
-                                  className={`p-2 rounded border text-xs cursor-pointer hover:opacity-80 transition-opacity ${getTaskColor(task.status)}`}
+                                  className={`p-2 rounded border text-xs cursor-pointer hover:opacity-80 transition-opacity ${getTaskColor(task.status)} relative`}
                                   onClick={() => handleTaskClick(task.id)}
                               >
+                                {/* Product Label */}
+                                {task.pb_components?.pb_products?.name && (
+                                  <div className="absolute -top-2 left-2 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white shadow-sm">
+                                    {task.pb_components.pb_products.name}
+                                  </div>
+                                )}
+
+                                {/* Task Content */}
+                                <div className="mt-3">
                                 <div className="font-medium">{task.name}</div>
                                 <div className="text-xs opacity-75">{task.description}</div>
                                 {task.status === 'Overdue' && (
                                   <div className="text-red-500 text-xs">⚠️</div>
                                 )}
+                                </div>
                               </div>
                             ))}
                           </div>
