@@ -1673,6 +1673,34 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </div>
             </TableCell>
           )}
+          {visibleColumns.progress && (
+            <TableCell className="w-[90px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              <div className="flex items-center justify-center" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+                <div className="relative w-10 h-10">
+                  <svg className="w-10 h-10 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke={getProgressColor(getProgressValue(child))}
+                      strokeWidth="2"
+                      strokeDasharray={`${getProgressValue(child)}, 100`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[10px] font-medium">
+                      {getProgressValue(child)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </TableCell>
+          )}
           {visibleColumns.version && (
             <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
               {child.data.version || "1.0.0"}
@@ -1683,26 +1711,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 child.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
                 child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' :
                 isValidStatus(child.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
               }`}>
                 {child?.data?.status || "-"}
               </span>
-            </TableCell>
-          )}
-          {visibleColumns.progress && (
-            <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
-                <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${getProgressValue(child)}%` }}
-                  ></div>
-                </div>
-                <span className="text-xs font-medium">
-                  {getProgressValue(child)}%
-                </span>
-              </div>
             </TableCell>
           )}
           {visibleColumns.team && (
@@ -2283,6 +2296,15 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
     return item.data.progress || 0;
   };
 
+  // Helper function to get progress color based on percentage
+  const getProgressColor = (progress: number): string => {
+    if (progress === 100) return '#22c55e'; // Green for 100%
+    if (progress >= 75) return '#2563eb'; // Blue for 75-99%
+    if (progress >= 50) return '#eab308'; // Yellow for 50-74%
+    if (progress >= 25) return '#f97316'; // Orange for 25-49%
+    return '#ef4444'; // Red for 0-24%
+  };
+
 
   return (
     <div className="w-full flex">
@@ -2501,6 +2523,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     Products, Components, Features
                   </TableHead>
                 )}
+                {visibleColumns.progress && (
+                  <TableHead className="w-[90px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    Progress
+                  </TableHead>
+                )}
                 {visibleColumns.version && (
                   <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center justify-center gap-1">
@@ -2512,11 +2539,6 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                 {visibleColumns.status && (
                   <TableHead className="w-[130px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
                     Status
-                  </TableHead>
-                )}
-                {visibleColumns.progress && (
-                  <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                    Progress
                   </TableHead>
                 )}
                 {visibleColumns.team && (
@@ -2679,6 +2701,34 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                       </div>
                       </TableCell>
                     )}
+                    {visibleColumns.progress && (
+                      <TableCell className="w-[90px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        <div className="flex items-center justify-center" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
+                          <div className="relative w-10 h-10">
+                            <svg className="w-10 h-10 transform -rotate-90" viewBox="0 0 36 36">
+                              <path
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke="#e5e7eb"
+                                strokeWidth="2"
+                              />
+                              <path
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none"
+                                stroke={getProgressColor(getProgressValue(item))}
+                                strokeWidth="2"
+                                strokeDasharray={`${getProgressValue(item)}, 100`}
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-[10px] font-medium">
+                                {getProgressValue(item)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    )}
                     {visibleColumns.version && (
                       <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
                         {item.data.version || "1.0.0"}
@@ -2689,26 +2739,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           item.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
                           item.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                          item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                          item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' :
                           isValidStatus(item.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {item.data.status || "-"}
                         </span>
-                      </TableCell>
-                    )}
-                    {visibleColumns.progress && (
-                      <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-                        <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
-                          <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${getProgressValue(item)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs font-medium">
-                            {getProgressValue(item)}%
-                          </span>
-                        </div>
                       </TableCell>
                     )}
                     {visibleColumns.team && (
