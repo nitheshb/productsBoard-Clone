@@ -244,7 +244,7 @@ const EmployeeBoard = ({ currentWeek, setCurrentWeek, teamMembers, tasks, search
   );
 };
 
-export default function EmployeesPage() {
+export default function CalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -385,7 +385,7 @@ export default function EmployeesPage() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading employee board...</p>
+              <p className="mt-2 text-gray-600">Loading calendar...</p>
             </div>
           </div>
         </main>
@@ -409,7 +409,7 @@ export default function EmployeesPage() {
               <div className="text-center">
                 <CalendarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h2 className="text-xl font-semibold text-gray-600 mb-2">No Team Members Found</h2>
-                <p className="text-gray-500">Create some features with team assignments to see the employee board.</p>
+                <p className="text-gray-500">Create some features with team assignments to see the calendar.</p>
               </div>
             </div>
           </div>
