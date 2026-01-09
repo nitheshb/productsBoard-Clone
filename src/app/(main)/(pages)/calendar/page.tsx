@@ -321,102 +321,104 @@ export default function CalendarPage() {
 
   return (
     <>
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-white">
-        <div className="max-w-8xl mx-auto">
-          {/* Header */}
-          <header className="sticky top-0 z-10 flex justify-between items-center p-4 bg-white border-b">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-6 w-6 text-blue-500" />
-              <h1 className="text-xl font-semibold">Dev Calendar</h1>
-            </div>
-
-            {/* Search Bar */}
-            <div className="flex-1 max-w-md mx-8">
-              <div className="relative">
-                <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search team members..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 bg-white">
+          <div className="max-w-8xl mx-auto h-full flex flex-col">
+            {/* Header */}
+            <header className="flex justify-between items-center p-4 bg-white border-b flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-6 w-6 text-blue-500" />
+                <h1 className="text-xl font-semibold">Dev Calendar</h1>
               </div>
-            </div>
 
-            {/* Product Filter Dropdown */}
-            <div className="flex items-center gap-4 mr-8">
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-              >
-                <option value="all">All Products</option>
-                {availableProducts.map((product: Product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {/* Day Selection Dropdown */}
-              <select
-                value={visibleDays.join(',')}
-                onChange={(e) => {
-                  const selectedDays = e.target.value.split(',').map(Number);
-                  setVisibleDays(selectedDays);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-              >
-                <option value="1,2,3,4,5">Weekdays (Mon-Fri)</option>
-                <option value="1,2,3,4,5,6">Mon-Sat</option>
-                <option value="1,2,3,4,5,6,0">Full Week</option>
-                <option value="1,2,3">Mon-Wed</option>
-                <option value="4,5">Thu-Fri</option>
-              </select>
-              
-              <button 
-                className="p-2 hover:bg-gray-100 rounded-lg"
-                onClick={() => {
-                  const newWeek = new Date(currentWeek);
-                  newWeek.setDate(newWeek.getDate() - 7);
-                  setCurrentWeek(newWeek);
-                }}
-              >
-                <ChevronLeftIcon className="h-5 w-5" />
-              </button>
-              <button 
-                className="p-2 hover:bg-gray-100 rounded-lg"
-                onClick={() => {
-                  const newWeek = new Date(currentWeek);
-                  newWeek.setDate(newWeek.getDate() + 7);
-                  setCurrentWeek(newWeek);
-                }}
-              >
-                <ChevronRightIcon className="h-5 w-5" />
-              </button>
-              <span className="text-sm text-gray-600">
-                {formatDateRange(weekStart, weekEnd)}
-              </span>
-            </div>
-          </header>
+              {/* Search Bar */}
+              <div className="flex-1 max-w-md mx-8">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search team members..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
 
-          <div className="p-4">
-            {/* Calendar Grid */}
-            <div className="w-full overflow-x-auto">
-              <div className={`grid gap-1 min-w-[800px]`} style={{ gridTemplateColumns: `200px repeat(${visibleDays.length}, 1fr)` }}>
-                {/* Header row */}
-                <div className="p-2 font-semibold text-gray-700">Team Members</div>
+              {/* Product Filter Dropdown */}
+              <div className="flex items-center gap-4 mr-8">
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="all">All Products</option>
+                  {availableProducts.map((product: Product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Day Selection Dropdown */}
+                <select
+                  value={visibleDays.join(',')}
+                  onChange={(e) => {
+                    const selectedDays = e.target.value.split(',').map(Number);
+                    setVisibleDays(selectedDays);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="1,2,3,4,5">Weekdays (Mon-Fri)</option>
+                  <option value="1,2,3,4,5,6">Mon-Sat</option>
+                  <option value="1,2,3,4,5,6,0">Full Week</option>
+                  <option value="1,2,3">Mon-Wed</option>
+                  <option value="4,5">Thu-Fri</option>
+                </select>
+
+                <button
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  onClick={() => {
+                    const newWeek = new Date(currentWeek);
+                    newWeek.setDate(newWeek.getDate() - 7);
+                    setCurrentWeek(newWeek);
+                  }}
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+                <button
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  onClick={() => {
+                    const newWeek = new Date(currentWeek);
+                    newWeek.setDate(newWeek.getDate() + 7);
+                    setCurrentWeek(newWeek);
+                  }}
+                >
+                  <ChevronRightIcon className="h-5 w-5" />
+                </button>
+                <span className="text-sm text-gray-600">
+                  {formatDateRange(weekStart, weekEnd)}
+                </span>
+              </div>
+            </header>
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-auto">
+              <div className="p-4">
+                {/* Calendar Grid */}
+                <div className="w-full">
+                  <div className={`grid gap-1 min-w-[800px]`} style={{ gridTemplateColumns: `200px repeat(${visibleDays.length}, 1fr)` }}>
+                    {/* Header row - Sticky */}
+                    <div className="p-2 font-semibold text-gray-700 bg-white sticky top-0 z-10 border-b-2 border-gray-200">Team Members</div>
                 {weekDates.map((date, index) => {
                   const dayOfWeek = date.getDay();
                   if (!visibleDays.includes(dayOfWeek)) return null;
                   
                   return (
-                    <div key={index} className="p-2 text-center border-b border-r border-gray-200">
+                    <div key={index} className="p-2 text-center border-b border-r border-gray-200 bg-white sticky top-0 z-10">
                       <div className="text-xs font-medium text-gray-500">
                         {date.toLocaleDateString('en', { weekday: 'short' }).toUpperCase()}
                       </div>
@@ -469,9 +471,10 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+          </div>
+          </div>
+        </main>
+      </div>
 
       {selectedFeatureId && (
         <FeatureDetailsPage
