@@ -54,6 +54,9 @@ export default function CalendarPage() {
   const [selectedProductId, setSelectedProductId] = useState<string>('all');
   const [availableProducts, setAvailableProducts] = useState<Array<{id: string, name: string}>>([]);
 
+  // Product label visibility toggle
+  const [showProductLabels, setShowProductLabels] = useState<boolean>(true);
+
   interface Product {
     id: string;
     name: string;
@@ -454,6 +457,23 @@ export default function CalendarPage() {
               <span className="text-sm text-gray-600">
                 {formatDateRange(weekStart, weekEnd)}
               </span>
+
+              {/* Product Label Toggle Button */}
+              <div className="flex items-center gap-2 ml-4">
+                <span className="text-sm font-medium text-gray-700">Product Labels</span>
+                <button
+                  onClick={() => setShowProductLabels(!showProductLabels)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    showProductLabels ? 'bg-blue-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
+                      showProductLabels ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </header>
 
@@ -550,7 +570,7 @@ export default function CalendarPage() {
                                   onClick={() => handleTaskClick(task.id)}
                               >
                                 {/* Product Label */}
-                                {task.pb_components?.pb_products?.name && (
+                                {showProductLabels && task.pb_components?.pb_products?.name && (
                                   <div className="absolute -top-2 left-2 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white shadow-sm">
                                     {task.pb_components.pb_products.name}
                                   </div>
