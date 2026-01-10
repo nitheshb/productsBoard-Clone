@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   ChevronDown,
@@ -37,6 +37,7 @@ import CreateProductModal from "./_components/createModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getVersionProgressDisplay } from "@/utils/versionProgressCalculator";
 import { toast } from "sonner";
+import { ProductTableSkeleton } from "@/components/ui/ProductTableSkeleton";
 
 // Helper: recursively check if any feature exists in the tree
 function hasAnyFeature(item: TableItem | undefined): boolean {
@@ -103,6 +104,11 @@ export default function ProductTable({
   );
   const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20); // Load 20 products initially
+  const [totalProducts, setTotalProducts] = useState(0);
   // Add state for editing product/component/feature
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
@@ -252,44 +258,41 @@ export default function ProductTable({
   async function fetchProducts(): Promise<void> {
     try {
       setLoading(true);
-      const { data: productsData, error: productsError } = await supabase
+
+      // Single optimized query with joins and pagination
+      const { data: productsData, error: productsError, count } = await supabase
         .from("pb_products")
-        .select("*")
-        .neq("name", "Sample Product 1");
+        .select(`
+          *,
+          pb_components (
+            *,
+            pb_features (*)
+          )
+        `, { count: 'exact' })
+        .neq("name", "Sample Product 1")
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
       if (productsError) throw productsError;
-      
-      // Fetch all components for all products
-      const productIds: string[] = (productsData as Product[]).map((p: Product) => p.id);
-      const { data: allComponents, error: componentsError } = await supabase
-        .from("pb_components")
-        .select("*")
-        .in("product_id", productIds);
-      if (componentsError) throw componentsError;
+      setTotalProducts(count || 0);
 
-      // Fetch all features for all components
-      const componentIds: string[] = (allComponents as Component[]).map((c: Component) => c.id);
-      const { data: allFeatures, error: featuresError } = await supabase
-        .from("pb_features")
-        .select("*")
-        .in("component_id", componentIds);
-      if (featuresError) throw featuresError;
+      if (productsError) throw productsError;
 
-      
-      // Group components by product_id
-      const componentsByProduct: Record<string, Component[]> = {};
-      for (const comp of allComponents as Component[]) {
-        if (!componentsByProduct[comp.product_id]) componentsByProduct[comp.product_id] = [];
-        componentsByProduct[comp.product_id].push(comp);
-      }
 
-      // Use the actual progress from database, don't recalculate here
-      let initialTableData: TableItem[] = (productsData as Product[]).map((product: Product) => {
-        const components: TableItem[] = (componentsByProduct[product.id] || []).map((component: Component) => ({
+      // Process the joined data structure
+      let initialTableData: TableItem[] = productsData.map((product: any) => {
+        const components: TableItem[] = (product.pb_components || []).map((component: any) => ({
           type: "component",
           id: component.id,
           name: component.name || "Component",
           level: 1,
           data: component,
+          children: (component.pb_features || []).map((feature: any) => ({
+            type: "feature",
+            id: feature.id,
+            name: feature.name || "Feature",
+            level: 2,
+            data: feature,
+          }))
         }));
 
         return {
@@ -297,7 +300,7 @@ export default function ProductTable({
           id: product.id,
           name: product.name || "Product",
           level: 0,
-          data: product, // Use the product data as-is, including stored progress
+          data: product,
           children: components,
         };
       });
@@ -336,8 +339,8 @@ export default function ProductTable({
     const validStatuses = ['Todo', 'In Progress', 'Completed'];
     return validStatuses.includes(status);
   };
-  // Apply all filters
-  async function filterTableData(baseData = allTableData) {
+  // Memoized filter function to prevent unnecessary recalculations
+  const filterTableData = useCallback(async (baseData = allTableData) => {
     let filtered = [...baseData];
     
     // Sort the data in ascending order by name
@@ -612,7 +615,7 @@ export default function ProductTable({
   }
 
   setTableData(filtered);
-}
+  }, [allTableData, selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, taskTypeFilter]);
 
   
   // Helper function to check if a date is today
@@ -1798,7 +1801,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   };
 
   if (loading) {
-    return <div className="flex justify-center p-10">Loading products...</div>;
+    return <ProductTableSkeleton />;
   }
   // When a feature is updated, ensure its parent component is expanded
   const handleComponentUpdated = (updatedComponent: Component) => {
@@ -2871,6 +2874,22 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </div>
           )}
         </div>
+
+        {/* Load More Button */}
+        {allTableData.length > 0 && allTableData.length < totalProducts && (
+          <div className="flex justify-center p-4 border-t">
+            <Button
+              onClick={() => {
+                setCurrentPage(prev => prev + 1);
+                fetchProducts();
+              }}
+              variant="outline"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : `Load More (${totalProducts - allTableData.length} remaining)`}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

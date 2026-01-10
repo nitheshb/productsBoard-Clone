@@ -5,6 +5,7 @@ import Sidebar from '@/app/(main)/(pages)/product/_components/sidebar';
 import { supabase } from '@/lib/supabaseClient';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, MagnifyingGlassIcon, ChevronDownIcon, CheckCircleIcon, PlusIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import React from 'react';
+import { GoalsSkeleton } from '@/components/ui/GoalsSkeleton';
 
 interface Goal {
   id: string;
@@ -702,19 +703,7 @@ export default function GoalsPage() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-white">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading goals roadmap...</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+    return <GoalsSkeleton />;
   }
 
   if (goals.length === 0) {

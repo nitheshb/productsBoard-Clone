@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import React from 'react';
 import FeatureDetailsPage from '@/app/(main)/(pages)/productTable/_components/featureDetails';
+import { CalendarSkeleton } from '@/components/ui/CalendarSkeleton';
 
 interface TeamMember {
   id: string;
@@ -94,17 +95,28 @@ export default function CalendarPage() {
       }, 10000); // 10 second timeout
       
       try {
-        // Fetch actual team names from the database
-        const { data: teamData, error: teamError } = await supabase
+        // Optimized single query to get both teams and tasks with relationships
+        const { data: taskData, error: fetchError } = await supabase
           .from('pb_features')
-          .select('team')
+          .select(`
+            id, name, description, team, startdate, targetdate, status, created_at,
+            pb_components!inner (
+              id,
+              name,
+              product_id,
+              pb_products!inner (
+                id,
+                name
+              )
+            )
+          `)
           .not('team', 'is', null);
 
-        if (teamError) throw teamError;
+        if (fetchError) throw fetchError;
 
-        // Get unique team names from database
-        const uniqueTeams = [...new Set(teamData.map(item => item.team).filter(Boolean))];
-        
+        // Extract unique teams from the task data
+        const uniqueTeams = [...new Set(taskData.map(item => item.team).filter(Boolean))];
+
         // Create team members from actual team names in database
         const teamMembers: TeamMember[] = uniqueTeams.map((team: string, index: number) => {
           const initials = team.split(' ').map((word: string) => word.charAt(0)).join('').toUpperCase();
@@ -121,22 +133,8 @@ export default function CalendarPage() {
         const sortedTeamMembers = teamMembers.sort((a, b) => a.name.localeCompare(b.name));
         setTeamMembers(sortedTeamMembers);
 
-        // Fetch tasks from features table
-        const { data: allTaskData, error: fetchError } = await supabase
-          .from('pb_features')
-          .select(`
-            id, name, description, team, startdate, targetdate, status, created_at,
-            pb_components!inner (
-              id,
-              name,
-              product_id,
-              pb_products!inner (
-                id,
-                name
-              )
-            )
-          `)
-          .not('team', 'is', null);
+        // Use the task data directly
+        const allTaskData = taskData;
 
         if (fetchError) throw fetchError;
 
@@ -186,19 +184,7 @@ export default function CalendarPage() {
   }, [selectedProductId]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-white">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading calendar...</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+    return <CalendarSkeleton />;
   }
 
   if (teamMembers.length === 0) {
