@@ -44,7 +44,14 @@ interface Product {
 }
 
 export default function CalendarPage() {
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  // Use lazy initialization to avoid hydration mismatch
+  const [currentWeek, setCurrentWeek] = useState(() => {
+    // Start from Monday of current week to ensure consistency
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // adjust when day is Sunday
+    return new Date(today.setDate(diff));
+  });
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +167,7 @@ export default function CalendarPage() {
                 targetDate: task.targetdate,
                 color: 'blue', // Default color since it's not in database
                 team: task.team,
-                created_at: task.created_at || new Date().toISOString(),
+                created_at: task.created_at || '2024-01-01T00:00:00.000Z',
                 pb_components: task.pb_components
               } as unknown as Task))
           : [];
