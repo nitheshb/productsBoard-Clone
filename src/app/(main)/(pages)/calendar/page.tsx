@@ -55,6 +55,7 @@ export default function CalendarPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleDays, setVisibleDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default to weekdays
 
@@ -94,13 +95,15 @@ export default function CalendarPage() {
     fetchProducts();
   }, []);
 
+  // Handle client-side mounting to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
-      // Add timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        setIsLoading(false);
-      }, 10000); // 10 second timeout
-      
+      setIsLoading(true);
+
       try {
         // Optimized single query to get both teams and tasks with relationships
         const { data: taskData, error: fetchError } = await supabase
@@ -175,13 +178,11 @@ export default function CalendarPage() {
         // Sort tasks alphabetically by name
         const sortedTasks = formattedTasks.sort((a, b) => a.name.localeCompare(b.name));
         setTasks(sortedTasks);
-        clearTimeout(timeoutId);
       } catch (error) {
         console.error('Error fetching data:', error);
         // Set empty arrays on error to prevent infinite loading
         setTeamMembers([]);
         setTasks([]);
-        clearTimeout(timeoutId);
       } finally {
         setIsLoading(false);
       }
@@ -190,7 +191,7 @@ export default function CalendarPage() {
     fetchData();
   }, [selectedProductId]);
 
-  if (isLoading) {
+  if (!isMounted || isLoading) {
     return <CalendarSkeleton />;
   }
 
@@ -531,8 +532,6 @@ export default function CalendarPage() {
                           <span className="text-green-600 font-semibold">{dayStats.completed}</span>
                           <span className="text-gray-400">|</span>
                           <span className="text-blue-600 font-semibold">{dayStats.inProgress}</span>
-                          <span className="text-gray-400">|</span>
-                          <span className="text-gray-500 font-semibold">{dayStats.notStarted}</span>
                           <span className="text-gray-400">|</span>
                           <span className="text-gray-900 font-bold">{dayStats.total}</span>
                         </div>
