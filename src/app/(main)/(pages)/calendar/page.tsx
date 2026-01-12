@@ -496,40 +496,45 @@ export default function CalendarPage() {
                         </div>
                       </div>
 
-                      {/* Statistics in horizontal layout */}
-                      <div className="flex items-center justify-center gap-1 text-[13px] mb-1 flex-wrap">
-                        <span className="text-green-600 font-semibold">✓{dayStats.completed}</span>
-                        <span className="text-gray-400">-</span>
-                        <span className="text-blue-600 font-semibold">⟳{dayStats.inProgress}</span>
-                        <span className="text-gray-400">-</span>
-                        <span className="text-gray-500 font-semibold">○{dayStats.notStarted}</span>
-                        <span className="text-gray-400">-</span>
-                        <span className="text-gray-900 font-bold">Σ{dayStats.total}</span>
-                      </div>
+                      {/* Statistics and Progress Bar in same horizontal line */}
+                      <div className="flex items-center justify-center gap-2 text-[13px]">
+                        {/* Circular Progress Bar with percentage first */}
+                        <div className="flex items-center gap-1">
+                          <div className="relative w-6 h-6">
+                            <svg className="w-6 h-6 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
+                                fill="none"
+                                stroke="#e5e7eb"
+                                strokeWidth="10"
+                              />
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
+                                fill="none"
+                                stroke={getProgressColor(dayStats.progressPercentage)}
+                                strokeWidth="10"
+                                strokeDasharray={`${(dayStats.progressPercentage / 100) * 113.04}, 113.04`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </div>
+                          <span className="font-medium text-gray-700">{dayStats.progressPercentage}%</span>
+                          <span className="text-gray-400">|</span>
+                        </div>
 
-                      {/* Circular Progress Bar - Same as products page */}
-                      <div className="flex justify-center">
-                        <div className="relative w-8 h-8">
-                          <svg className="w-8 h-8 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
-                            <circle
-                              cx="25"
-                              cy="25"
-                              r="18"
-                              fill="none"
-                              stroke="#e5e7eb"
-                              strokeWidth="10"
-                            />
-                            <circle
-                              cx="25"
-                              cy="25"
-                              r="18"
-                              fill="none"
-                              stroke={getProgressColor(dayStats.progressPercentage)}
-                              strokeWidth="10"
-                              strokeDasharray={`${(dayStats.progressPercentage / 100) * 113.04}, 113.04`}
-                              strokeLinecap="round"
-                            />
-                          </svg>
+                        {/* Task counts with | separators */}
+                        <div className="flex items-center gap-1 text-gray-600">
+                          <span className="text-green-600 font-semibold">{dayStats.completed}</span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-blue-600 font-semibold">{dayStats.inProgress}</span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-gray-500 font-semibold">{dayStats.notStarted}</span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-gray-900 font-bold">{dayStats.total}</span>
                         </div>
                       </div>
                     </div>
