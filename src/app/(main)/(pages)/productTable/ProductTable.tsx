@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   ChevronDown,
@@ -37,6 +37,7 @@ import CreateProductModal from "./_components/createModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getVersionProgressDisplay } from "@/utils/versionProgressCalculator";
 import { toast } from "sonner";
+import { ProductTableSkeleton } from "@/components/ui/ProductTableSkeleton";
 
 // Helper: recursively check if any feature exists in the tree
 function hasAnyFeature(item: TableItem | undefined): boolean {
@@ -103,6 +104,11 @@ export default function ProductTable({
   );
   const [isFeatureDetailOpen, setIsFeatureDetailOpen] = useState(false);
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20); // Load 20 products initially
+  const [totalProducts, setTotalProducts] = useState(0);
   // Add state for editing product/component/feature
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
@@ -252,44 +258,41 @@ export default function ProductTable({
   async function fetchProducts(): Promise<void> {
     try {
       setLoading(true);
-      const { data: productsData, error: productsError } = await supabase
+
+      // Single optimized query with joins and pagination
+      const { data: productsData, error: productsError, count } = await supabase
         .from("pb_products")
-        .select("*")
-        .neq("name", "Sample Product 1");
+        .select(`
+          *,
+          pb_components (
+            *,
+            pb_features (*)
+          )
+        `, { count: 'exact' })
+        .neq("name", "Sample Product 1")
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
       if (productsError) throw productsError;
-      
-      // Fetch all components for all products
-      const productIds: string[] = (productsData as Product[]).map((p: Product) => p.id);
-      const { data: allComponents, error: componentsError } = await supabase
-        .from("pb_components")
-        .select("*")
-        .in("product_id", productIds);
-      if (componentsError) throw componentsError;
+      setTotalProducts(count || 0);
 
-      // Fetch all features for all components
-      const componentIds: string[] = (allComponents as Component[]).map((c: Component) => c.id);
-      const { data: allFeatures, error: featuresError } = await supabase
-        .from("pb_features")
-        .select("*")
-        .in("component_id", componentIds);
-      if (featuresError) throw featuresError;
+      if (productsError) throw productsError;
 
-      
-      // Group components by product_id
-      const componentsByProduct: Record<string, Component[]> = {};
-      for (const comp of allComponents as Component[]) {
-        if (!componentsByProduct[comp.product_id]) componentsByProduct[comp.product_id] = [];
-        componentsByProduct[comp.product_id].push(comp);
-      }
 
-      // Use the actual progress from database, don't recalculate here
-      let initialTableData: TableItem[] = (productsData as Product[]).map((product: Product) => {
-        const components: TableItem[] = (componentsByProduct[product.id] || []).map((component: Component) => ({
+      // Process the joined data structure
+      let initialTableData: TableItem[] = productsData.map((product: any) => {
+        const components: TableItem[] = (product.pb_components || []).map((component: any) => ({
           type: "component",
           id: component.id,
           name: component.name || "Component",
           level: 1,
           data: component,
+          children: (component.pb_features || []).map((feature: any) => ({
+            type: "feature",
+            id: feature.id,
+            name: feature.name || "Feature",
+            level: 2,
+            data: feature,
+          }))
         }));
 
         return {
@@ -297,7 +300,7 @@ export default function ProductTable({
           id: product.id,
           name: product.name || "Product",
           level: 0,
-          data: product, // Use the product data as-is, including stored progress
+          data: product,
           children: components,
         };
       });
@@ -336,8 +339,8 @@ export default function ProductTable({
     const validStatuses = ['Todo', 'In Progress', 'Completed'];
     return validStatuses.includes(status);
   };
-  // Apply all filters
-  async function filterTableData(baseData = allTableData) {
+  // Memoized filter function to prevent unnecessary recalculations
+  const filterTableData = useCallback(async (baseData = allTableData) => {
     let filtered = [...baseData];
     
     // Sort the data in ascending order by name
@@ -612,7 +615,7 @@ export default function ProductTable({
   }
 
   setTableData(filtered);
-}
+  }, [allTableData, selectedProductIds, teamFilter, statusFilter, versionFilter, startDateFilter, endDateFilter, taskTypeFilter]);
 
   
   // Helper function to check if a date is today
@@ -1673,6 +1676,37 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </div>
             </TableCell>
           )}
+          {visibleColumns.progress && (
+            <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+              <div className="flex items-center justify-center gap-2 overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
+                <div className="relative w-7 h-7 overflow-visible">
+                  <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="18"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="12"
+                    />
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="18"
+                      fill="none"
+                      stroke={getProgressColor(getProgressValue(child))}
+                      strokeWidth="12"
+                      strokeDasharray={`${(getProgressValue(child) / 100) * 113.04}, 113.04`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+                <span className="text-xs font-medium w-8 text-left">
+                  {getProgressValue(child)}%
+                </span>
+              </div>
+            </TableCell>
+          )}
           {visibleColumns.version && (
             <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
               {child.data.version || "1.0.0"}
@@ -1683,26 +1717,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 child.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
                 child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' :
                 isValidStatus(child.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
               }`}>
                 {child?.data?.status || "-"}
               </span>
-            </TableCell>
-          )}
-          {visibleColumns.progress && (
-            <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
-                <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${getProgressValue(child)}%` }}
-                  ></div>
-                </div>
-                <span className="text-xs font-medium">
-                  {getProgressValue(child)}%
-                </span>
-              </div>
             </TableCell>
           )}
           {visibleColumns.team && (
@@ -1782,7 +1801,7 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
   };
 
   if (loading) {
-    return <div className="flex justify-center p-10">Loading products...</div>;
+    return <ProductTableSkeleton />;
   }
   // When a feature is updated, ensure its parent component is expanded
   const handleComponentUpdated = (updatedComponent: Component) => {
@@ -2283,6 +2302,15 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
     return item.data.progress || 0;
   };
 
+  // Helper function to get progress color based on percentage
+  const getProgressColor = (progress: number): string => {
+    if (progress === 100) return '#059669'; // Emerald-600: Complete success (green)
+    if (progress >= 76) return '#2563eb'; // Blue-600: Almost there (76-99%)
+    if (progress >= 51) return '#7c3aed'; // Violet-600: Good progress (51-75%)
+    if (progress >= 26) return '#d97706'; // Amber-600: Moderate progress (26-50%)
+    return '#dc2626'; // Red-600: Needs attention (0-25%)
+  };
+
 
   return (
     <div className="w-full flex">
@@ -2501,6 +2529,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                     Products, Components, Features
                   </TableHead>
                 )}
+                {visibleColumns.progress && (
+                  <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
+                    Progress
+                  </TableHead>
+                )}
                 {visibleColumns.version && (
                   <TableHead className="w-[100px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center justify-center gap-1">
@@ -2512,11 +2545,6 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                 {visibleColumns.status && (
                   <TableHead className="w-[130px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
                     Status
-                  </TableHead>
-                )}
-                {visibleColumns.progress && (
-                  <TableHead className="w-[120px] text-center text-[13px] font-bold text-gray-700 border-r border-gray-200">
-                    Progress
                   </TableHead>
                 )}
                 {visibleColumns.team && (
@@ -2679,6 +2707,37 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                       </div>
                       </TableCell>
                     )}
+                    {visibleColumns.progress && (
+                      <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
+                        <div className="flex items-center justify-center gap-2 overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
+                          <div className="relative w-7 h-7 overflow-visible">
+                            <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
+                                fill="none"
+                                stroke="#e5e7eb"
+                                strokeWidth="12"
+                              />
+                              <circle
+                                cx="25"
+                                cy="25"
+                                r="18"
+                                fill="none"
+                                stroke={getProgressColor(getProgressValue(item))}
+                                strokeWidth="12"
+                                strokeDasharray={`${(getProgressValue(item) / 100) * 113.04}, 113.04`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </div>
+                          <span className="text-xs font-medium w-8 text-left">
+                            {getProgressValue(item)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                    )}
                     {visibleColumns.version && (
                       <TableCell className="w-[100px] text-center text-[14px] text-gray-700 border-r border-gray-200">
                         {item.data.version || "1.0.0"}
@@ -2689,26 +2748,11 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           item.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
                           item.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                          item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' : 
+                          item.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' :
                           isValidStatus(item.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {item.data.status || "-"}
                         </span>
-                      </TableCell>
-                    )}
-                    {visibleColumns.progress && (
-                      <TableCell className="w-[120px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-                        <div className="flex items-center gap-2" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : "Product Progress"}>
-                          <div className="w-16 bg-gray-200 rounded-full h-2" style={{ minWidth: 64 }}>
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${getProgressValue(item)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs font-medium">
-                            {getProgressValue(item)}%
-                          </span>
-                        </div>
                       </TableCell>
                     )}
                     {visibleColumns.team && (
@@ -2830,6 +2874,22 @@ function applyNestedDateFilter(item: TableItem, start?: Date, end?: Date): Table
             </div>
           )}
         </div>
+
+        {/* Load More Button */}
+        {allTableData.length > 0 && allTableData.length < totalProducts && (
+          <div className="flex justify-center p-4 border-t">
+            <Button
+              onClick={() => {
+                setCurrentPage(prev => prev + 1);
+                fetchProducts();
+              }}
+              variant="outline"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : `Load More (${totalProducts - allTableData.length} remaining)`}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

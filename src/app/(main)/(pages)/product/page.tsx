@@ -8,6 +8,7 @@ import Sidebar from './_components/sidebar';
 import { supabase } from '@/lib/supabaseClient';
 import { FilterContainer } from '@/components/filters/filtercontainer';
 import { fetchExistingTeamMembers, teamEventEmitter, TeamMember } from '@/utils/teamUtils';
+import { ProductTableSkeleton } from '@/components/ui/ProductTableSkeleton';
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -28,49 +29,75 @@ export default function Home() {
     const [availableTaskTypes, setAvailableTaskTypes] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch filter options from database
+    // Cache for filter options (5 minute expiry)
+    const CACHE_KEY = 'productFilters';
+    const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+    // Fetch filter options from database - optimized with caching and parallel queries
     useEffect(() => {
         async function fetchFilterOptions() {
             setIsLoading(true);
-            try {
-                // Fetch team members using the real-time system
-                const teamMembers = await fetchExistingTeamMembers();
-                // Store full TeamMember objects so we can preserve ids if available
-                setAvailableTeams(teamMembers);
-                
-                // Fetch unique status values from database
-                const { data: statusData, error: statusError } = await supabase
-                    .from('pb_features')
-                    .select('status')
-                    .not('status', 'is', null);
-                
-                if (statusError) throw statusError;
 
-                const statuses = new Set(statusData.map(item => item.status).filter(Boolean));
+            // Check cache first
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try {
+                    const { data, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CACHE_EXPIRY) {
+                        setAvailableTeams(data.teams);
+                        setAvailableStatuses(data.statuses);
+                        setAvailableVersions(data.versions);
+                        setAvailableTaskTypes(data.taskTypes);
+                        setIsLoading(false);
+                        return;
+                    }
+                } catch (e) {
+                    // Invalid cache, continue with fetch
+                }
+            }
+
+            try {
+                // Use Promise.all for parallel queries to reduce loading time
+                const [teamMembers, statusResult, versionResult] = await Promise.all([
+                    fetchExistingTeamMembers(),
+                    supabase.from('pb_features').select('status').not('status', 'is', null),
+                    supabase.from('pb_versions').select('version').order('version', { ascending: true })
+                ]);
+
+                // Process team members
+                setAvailableTeams(teamMembers);
+
+                // Process statuses
+                if (statusResult.error) throw statusResult.error;
+                const statuses = new Set(statusResult.data.map(item => item.status).filter(Boolean));
                 setAvailableStatuses(Array.from(statuses) as string[]);
 
-                // Fetch versions from database
-                const { data: versionData, error: versionError } = await supabase
-                    .from('pb_versions')
-                    .select('version')
-                    .order('version', { ascending: true });
-                
-                if (versionError) throw versionError;
-
-                const versions = versionData.map(item => item.version);
+                // Process versions
+                if (versionResult.error) throw versionResult.error;
+                const versions = versionResult.data.map(item => item.version);
                 setAvailableVersions(versions);
 
-                // Use predefined task types from create form - only main categories
+                // Use predefined task types (no database query needed)
                 const mainTaskTypes = ['Development', 'Testing'];
-                
                 setAvailableTaskTypes(mainTaskTypes);
+
+                // Cache the results
+                const cacheData = {
+                    teams: teamMembers,
+                    statuses: Array.from(statuses) as string[],
+                    versions,
+                    taskTypes: mainTaskTypes,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
             } catch (error) {
                 console.error("Error fetching filter options:", error);
             } finally {
                 setIsLoading(false);
             }
         }
-        
+
         fetchFilterOptions();
     }, []);
 
@@ -162,15 +189,19 @@ export default function Home() {
                 </div>
 
                 <div className="bg-gray-100">
-                    <ProductTable 
-                        selectedProductIds={selectedProductIds}
-                        teamFilter={selectedTeams.map(team => typeof team === 'string' ? team : team.name)}
-                        statusFilter={selectedStatuses}
-                        versionFilter={selectedVersions}
-                        taskTypeFilter={selectedTaskTypes}
-                        startDateFilter={startDate}
-                        endDateFilter={endDate}
-                    />
+                    {isLoading ? (
+                        <ProductTableSkeleton />
+                    ) : (
+                        <ProductTable
+                            selectedProductIds={selectedProductIds}
+                            teamFilter={selectedTeams.map(team => typeof team === 'string' ? team : team.name)}
+                            statusFilter={selectedStatuses}
+                            versionFilter={selectedVersions}
+                            taskTypeFilter={selectedTaskTypes}
+                            startDateFilter={startDate}
+                            endDateFilter={endDate}
+                        />
+                    )}
                 </div>
             </main>
         </div>
