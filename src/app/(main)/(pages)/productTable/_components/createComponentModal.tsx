@@ -12,8 +12,8 @@ import { Loader2 } from "lucide-react";
 interface CreateComponentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productId: string | null;
-  onComponentCreated: (component: any, productId: string) => void;
+  subproductId: string | null;
+  onComponentCreated: (component: any, subproductId: string) => void;
   componentId?: string | null; // <-- new prop for update
 }
 
@@ -33,7 +33,7 @@ function ComponentCreateTab({ label, isActive, onClick }: { label: string; isAct
 export function CreateComponentModal({
   isOpen,
   onClose,
-  productId,
+  subproductId,
   onComponentCreated,
   componentId = null,
 }: CreateComponentModalProps) {
@@ -44,7 +44,7 @@ export function CreateComponentModal({
     status: "Todo", // Added status field
     team: "", // Added team field
     team_id: null as string | null,
-    product_id: productId,
+    subproduct_id: subproductId,
     startDate: null,
     targetDate: null,
     completedOn: null,
@@ -61,13 +61,13 @@ export function CreateComponentModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (productId) {
+    if (subproductId) {
       setFormData(prev => ({
         ...prev,
-        product_id: productId
+        subproduct_id: subproductId
       }));
     }
-  }, [productId]);
+  }, [subproductId]);
 
   // Fetch component data if editing
   useEffect(() => {
@@ -83,7 +83,7 @@ export function CreateComponentModal({
             status: data.status || "Todo", // Fetch status
             team: data.team || "", // Fetch team
             team_id: data.team_id || null,
-            product_id: data.product_id || productId,
+            subproduct_id: data.subproduct_id || subproductId,
             startDate: data.startDate || null,
             targetDate: data.targetDate || null,
             completedOn: data.completedOn || null,
@@ -99,14 +99,14 @@ export function CreateComponentModal({
         status: "Todo", // Default status for new component
         team: "", // Default team for new component
         team_id: null,
-        product_id: productId,
+        subproduct_id: subproductId,
         startDate: null,
         targetDate: null,
         completedOn: null,
         description: "",
       });
     }
-  }, [componentId, isOpen, productId]);
+  }, [componentId, isOpen, subproductId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -143,8 +143,8 @@ export function CreateComponentModal({
   };
 
   const handleSubmit = async () => {
-    if (!formData.product_id) {
-      toast.error("Product ID is null, cannot create/update component.");
+    if (!formData.subproduct_id) {
+      toast.error("Subproduct ID is null, cannot create/update component.");
       return;
     }
     
@@ -183,7 +183,7 @@ export function CreateComponentModal({
         toast.success("Component created successfully!");
       }
       if (data && data.length > 0) {
-        onComponentCreated(data[0], formData.product_id);
+        onComponentCreated(data[0], formData.subproduct_id);
         onClose();
         setFormData({
           name: "",
@@ -192,7 +192,7 @@ export function CreateComponentModal({
           status: "Todo", // Reset status
           team: "", // Reset team
           team_id: null,
-          product_id: formData.product_id,
+          subproduct_id: formData.subproduct_id,
           startDate: null,
           targetDate: null,
           completedOn: null,
@@ -214,7 +214,7 @@ export function CreateComponentModal({
       status: "Todo", // Reset status
       team: "", // Reset team
       team_id: null,
-      product_id: productId,
+      subproduct_id: subproductId,
       startDate: null,
       targetDate: null,
       completedOn: null,

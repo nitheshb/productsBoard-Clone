@@ -163,7 +163,15 @@ function DetailsTabContent({
           {editingField === 'team' ? (
             <TeamDropdown
               value={draftComponent?.team ?? ''}
-              onChange={(value) => handleInputChange('team', value)}
+              onChange={(value) => {
+                if (typeof value === 'string') {
+                  handleInputChange('team', value);
+                  handleInputChange('team_id', null);
+                } else {
+                  handleInputChange('team', value.name);
+                  handleInputChange('team_id', value.id || null);
+                }
+              }}
               placeholder="Udpate team member"
               className="w-full"
               disabled={saving}

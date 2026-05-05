@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
+export const dynamic = 'force-dynamic';
+
 // Helper function to validate status values
 const isValidStatus = (status: string | undefined): boolean => {
   if (!status) return false;
@@ -173,6 +175,15 @@ export async function PUT(
     }
 
     console.log('Product updated successfully:', data[0]);
+
+    // Trigger version progress update
+    try {
+      const { updateProductVersionProgress } = await import('@/utils/versionProgressCalculator');
+      await updateProductVersionProgress(id);
+    } catch (progressError) {
+      console.error('Error updating product version progress:', progressError);
+    }
+
     return NextResponse.json(data[0]);
   } catch (error) {
     console.error('Error in PUT /api/product/[id]:', error);

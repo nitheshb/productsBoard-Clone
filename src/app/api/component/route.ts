@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { updateProductProgressWithParents } from '@/utils/progressCalculator';
+import { updateProductProgressWithParents, updateComponentProgressWithParents } from '@/utils/progressCalculator';
 
 // Helper function to determine status based on progress
 const getStatusFromProgress = (progress: number): string => {
@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    if (!body.name || !body.product_id) {
-      return NextResponse.json({ error: 'Component name and product_id are required' }, { status: 400 });
+    if (!body.name || !body.subproduct_id) {
+      return NextResponse.json({ error: 'Component name and subproduct_id are required' }, { status: 400 });
     }
 
     // Extract the flag, defaulting to true if not specified
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       .from('pb_components')
       .insert([{
         name: componentData.name,
-        product_id: componentData.product_id,
+        subproduct_id: componentData.subproduct_id,
         status: componentData.status || null,
         progress: componentData.progress !== undefined ? componentData.progress : null,
         team: componentData.team || null,
@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
     // Update product progress and version progress if flag is true
     if (shouldUpdateProductProgress) {
       try {
-        await updateProductProgressWithParents(componentData.product_id);
+        await updateComponentProgressWithParents(data[0].id);
       } catch (progressError) {
-        console.error('Error updating product progress:', progressError);
+        console.error('Error updating progress:', progressError);
         // Don't fail the component creation if progress update fails
       }
     }

@@ -3,7 +3,9 @@
 // components/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { updateProductProgressWithParents } from '@/utils/progressCalculator';
+
+export const dynamic = 'force-dynamic';
+import { updateProductProgressWithParents, updateComponentProgressWithParents, updateSubproductProgressInDb } from '@/utils/progressCalculator';
 
 // Helper function to determine status based on progress
 const getStatusFromProgress = (progress: number): string => {
@@ -86,10 +88,10 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    // Check if component exists and get its product_id
+    // Check if component exists and get its subproduct_id
     const { data: existingComponent, error: checkError } = await supabase
       .from('pb_components')
-      .select('id, product_id')
+      .select('id, subproduct_id')
       .eq('id', id)
       .single();
 
@@ -128,7 +130,7 @@ export async function PUT(
       remarks: updateData.remarks ?? null,
       description: updateData.description ?? null,
       version: updateData.version ?? null,
-      product_id: updateData.product_id ?? null
+      subproduct_id: updateData.subproduct_id ?? null
     };
 
     // Handle date fields with snake_case
@@ -168,14 +170,14 @@ export async function PUT(
     
     console.log('Component updated successfully:', data[0]);
 
-    // Update product progress and version progress if flag is true
-    if (shouldUpdateProductProgress && existingComponent?.product_id) {
+    // Update progress and version progress if flag is true
+    if (shouldUpdateProductProgress) {
       try {
-        console.log(`Updating product progress for product ${existingComponent.product_id} after component update`);
-        const updatedProgress = await updateProductProgressWithParents(existingComponent.product_id);
-        console.log(`Product progress updated to: ${updatedProgress}%`);
+        console.log(`Updating progress for component ${id} after update`);
+        const updatedProgress = await updateComponentProgressWithParents(id);
+        console.log(`Progress updated: ${updatedProgress}%`);
       } catch (progressError) {
-        console.error('Error updating product progress:', progressError);
+        console.error('Error updating progress:', progressError);
         // Don't fail the component update if progress update fails
       }
     }
@@ -195,10 +197,10 @@ export async function DELETE(
   try {
     const { id } = params;
 
-    // Get the product_id before deleting
+    // Get the subproduct_id before deleting
     const { data: component, error: fetchError } = await supabase
       .from('pb_components')
-      .select('product_id')
+      .select('subproduct_id')
       .eq('id', id)
       .single();
 
@@ -214,13 +216,12 @@ export async function DELETE(
 
     if (error) throw error;
 
-    // Update product progress and version progress after deletion
-    if (component?.product_id) {
+    // Update subproduct progress after deletion
+    if (component?.subproduct_id) {
       try {
-        await updateProductProgressWithParents(component.product_id);
+        await updateSubproductProgressInDb(component.subproduct_id);
       } catch (progressError) {
-        console.error('Error updating product progress after deletion:', progressError);
-        // Don't fail the deletion if progress update fails
+        console.error('Error updating subproduct progress after deletion:', progressError);
       }
     }
 

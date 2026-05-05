@@ -38,6 +38,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getVersionProgressDisplay } from "@/utils/versionProgressCalculator";
 import { toast } from "sonner";
 import { ProductTableSkeleton } from "@/components/ui/ProductTableSkeleton";
+import { SubproductSidesheet } from "./_components/subproductSidesheet";
+import { Subproduct } from "@/app/types";
 
 // Helper: recursively check if any feature exists in the tree
 function hasAnyFeature(item: TableItem | undefined): boolean {
@@ -80,7 +82,7 @@ export default function ProductTable({
   const [featureStatusFilter, setFeatureStatusFilter] = useState<string[]>([]);
   const [isCreateComponentModalOpen, setIsCreateComponentModalOpen] =
     useState(false);
-  const [selectedProductIdForComponent, setSelectedProductIdForComponent] =
+  const [selectedSubproductIdForComponent, setSelectedSubproductIdForComponent] =
     useState<string | null>(null);
   const [isCreateFeatureModalOpen, setIsCreateFeatureModalOpen] =
     useState(false);
@@ -88,7 +90,7 @@ export default function ProductTable({
     useState<string | null>(null);
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
-  const [creatingComponentForProduct, setCreatingComponentForProduct] =
+  const [creatingComponentForSubproduct, setCreatingComponentForSubproduct] =
     useState<string | null>(null);
   const [newComponentName, setNewComponentName] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<TableItem | null>(
@@ -109,6 +111,12 @@ export default function ProductTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalProducts, setTotalProducts] = useState(0);
+
+  // Subproduct state
+  const [isSubproductSidesheetOpen, setIsSubproductSidesheetOpen] = useState(false);
+  const [selectedSubproductId, setSelectedSubproductId] = useState<string | null>(null);
+  const [selectedSubproductData, setSelectedSubproductData] = useState<Partial<Subproduct> | null>(null);
+  const [selectedProductIdForSubproduct, setSelectedProductIdForSubproduct] = useState<string | null>(null);
 
   // Add state for editing product/component/feature
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -239,19 +247,28 @@ export default function ProductTable({
 
     if (expandedComponentIds.length === 0) return tableDataToUpdate;
 
-    // For each product, update its children (components)
+    // Iterate: Product -> Subproduct -> Component
     const updatedTableData: TableItem[] = await Promise.all(tableDataToUpdate.map(async (product: TableItem) => {
       if (!product.children) return product;
-      const updatedChildren: TableItem[] = await Promise.all(product.children.map(async (component: TableItem) => {
-        if (expandedComponentIds.includes(component.id)) {
-          // Fetch features for this component
-          const features: TableItem[] = (await fetchFeatures(component.id)) as TableItem[];
-          return { ...component, children: features };
-        }
-        return component;
+      
+      const updatedSubproducts: TableItem[] = await Promise.all(product.children.map(async (subproduct: TableItem) => {
+        if (!subproduct.children) return subproduct;
+        
+        const updatedComponents: TableItem[] = await Promise.all(subproduct.children.map(async (component: TableItem) => {
+          if (expandedComponentIds.includes(component.id)) {
+            // Fetch features for this component
+            const features: TableItem[] = (await fetchFeatures(component.id)) as TableItem[];
+            return { ...component, children: features };
+          }
+          return component;
+        }));
+        
+        return { ...subproduct, children: updatedComponents };
       }));
-      return { ...product, children: updatedChildren };
+      
+      return { ...product, children: updatedSubproducts };
     }));
+    
     return updatedTableData;
   }
 
@@ -265,9 +282,12 @@ export default function ProductTable({
         .from("pb_products")
         .select(`
           *,
-          pb_components (
+          pb_subproducts:pb_subproducts!fk_subproducts_product (
             *,
-            pb_features (*)
+            pb_components:pb_components!pb_components_subproduct_id_fkey (
+              *,
+              pb_features (*)
+            )
           )
         `, { count: 'exact' })
         .neq("name", "Sample Product 1")
@@ -280,18 +300,25 @@ export default function ProductTable({
 
       // Process the joined data structure
       let initialTableData: TableItem[] = productsData.map((product: any) => {
-        const components: TableItem[] = (product.pb_components || []).map((component: any) => ({
-          type: "component",
-          id: component.id,
-          name: component.name || "Component",
+        const subproducts: TableItem[] = (product.pb_subproducts || []).map((subproduct: any) => ({
+          type: "subproduct",
+          id: subproduct.id,
+          name: subproduct.name || "Subproduct",
           level: 1,
-          data: component,
-          children: (component.pb_features || []).map((feature: any) => ({
-            type: "feature",
-            id: feature.id,
-            name: feature.name || "Feature",
+          data: subproduct,
+          children: (subproduct.pb_components || []).map((component: any) => ({
+            type: "component",
+            id: component.id,
+            name: component.name || "Component",
             level: 2,
-            data: feature,
+            data: component,
+            children: (component.pb_features || []).map((feature: any) => ({
+              type: "feature",
+              id: feature.id,
+              name: feature.name || "Feature",
+              level: 3,
+              data: feature,
+            }))
           }))
         }));
 
@@ -301,7 +328,7 @@ export default function ProductTable({
           name: product.name || "Product",
           level: 0,
           data: product,
-          children: components,
+          children: subproducts,
         };
       });
 
@@ -347,7 +374,7 @@ export default function ProductTable({
     const sortData = (data: TableItem[]): TableItem[] => {
       return data.sort((a, b) => {
         // First sort by type (products, then components, then features)
-        const typeOrder = { 'product': 0, 'component': 1, 'feature': 2 };
+        const typeOrder = { 'product': 0, 'subproduct': 1, 'component': 2, 'feature': 3 };
         const typeComparison = typeOrder[a.type] - typeOrder[b.type];
         if (typeComparison !== 0) return typeComparison;
 
@@ -375,11 +402,15 @@ export default function ProductTable({
 
       for (const product of filtered) {
         if (product.children && product.children.length > 0) {
-          for (const component of product.children) {
-            if (!component.children || component.children.length === 0) {
-              // Load features for this component
-              const features = await fetchFeatures(component.id);
-              component.children = features as TableItem[];
+          for (const subproduct of product.children) {
+            if (subproduct.children && subproduct.children.length > 0) {
+              for (const component of subproduct.children) {
+                if (!component.children || component.children.length === 0) {
+                  // Load features for this component
+                  const features = await fetchFeatures(component.id);
+                  component.children = features as TableItem[];
+                }
+              }
             }
           }
         }
@@ -394,14 +425,20 @@ export default function ProductTable({
         return product.children.length > 0;
       });
 
-      // Auto-expand products and components that have matching features
+      // Auto-expand products, subproducts and components that have matching features
       for (const product of filtered) {
         if (product && product.children && product.children.length > 0) {
           newExpandedItems[`product-${product.id}`] = true;
 
-          for (const component of product.children) {
-            if (component && component.children && component.children.length > 0) {
-              newExpandedItems[`component-${component.id}`] = true;
+          for (const subproduct of product.children) {
+            if (subproduct && subproduct.children && subproduct.children.length > 0) {
+              newExpandedItems[`subproduct-${subproduct.id}`] = true;
+
+              for (const component of subproduct.children) {
+                if (component && component.children && component.children.length > 0) {
+                  newExpandedItems[`component-${component.id}`] = true;
+                }
+              }
             }
           }
         }
@@ -419,20 +456,20 @@ export default function ProductTable({
       for (const product of filtered) {
         newExpandedItems[`product-${product.id}`] = true;
 
-        // Load components if not already loaded
+        // Load subproducts if not already loaded
         if (!product.children || product.children.length === 0) {
-          const components = await fetchComponents(product.id);
-          product.children = components as TableItem[];
+          const subproducts = await fetchSubproducts(product.id);
+          product.children = subproducts as TableItem[];
         }
 
         if (product.children && Array.isArray(product.children)) {
-          for (const component of product.children) {
-            newExpandedItems[`component-${component.id}`] = true;
+          for (const subproduct of product.children) {
+            newExpandedItems[`subproduct-${subproduct.id}`] = true;
 
-            // Load features if not already loaded
-            if (!component.children || component.children.length === 0) {
-              const features = await fetchFeatures(component.id);
-              component.children = features as TableItem[];
+            // Load components if not already loaded
+            if (!subproduct.children || subproduct.children.length === 0) {
+              const components = await fetchComponents(subproduct.id);
+              subproduct.children = components as TableItem[];
             }
           }
         }
@@ -470,36 +507,46 @@ export default function ProductTable({
       const productsWithMatchingFeatures: TableItem[] = [];
 
       for (const product of filtered) {
-        // Load components if not already loaded
+        // Load subproducts if not already loaded
         if (!product.children || product.children.length === 0) {
-          const components = await fetchComponents(product.id);
-          product.children = components as TableItem[];
+          const subproducts = await fetchSubproducts(product.id);
+          product.children = subproducts as TableItem[];
         }
 
         let hasMatchingFeature = false;
 
         if (product.children && Array.isArray(product.children)) {
-          for (const component of product.children) {
-            // Load features if not already loaded
-            if (!component.children || component.children.length === 0) {
-              const features = await fetchFeatures(component.id);
-              component.children = features as TableItem[];
+          for (const subproduct of product.children) {
+            // Load components if not already loaded
+            if (!subproduct.children || subproduct.children.length === 0) {
+              const components = await fetchComponents(subproduct.id);
+              subproduct.children = components as TableItem[];
             }
 
-            // Check if any feature matches the task type filter
-            if (component.children && Array.isArray(component.children)) {
-              for (const feature of component.children) {
-                if (feature.type === "feature") {
-                  const featureData = feature.data as Feature;
-                  // Direct match on task_type column
-                  if (featureData.task_type && taskTypeFilter.includes(featureData.task_type)) {
-                    hasMatchingFeature = true;
-                    break;
+            if (subproduct.children && Array.isArray(subproduct.children)) {
+              for (const component of subproduct.children) {
+                // Load features if not already loaded
+                if (!component.children || component.children.length === 0) {
+                  const features = await fetchFeatures(component.id);
+                  component.children = features as TableItem[];
+                }
+
+                // Check if any feature matches the task type filter
+                if (component.children && Array.isArray(component.children)) {
+                  for (const feature of component.children) {
+                    if (feature.type === "feature") {
+                      const featureData = feature.data as Feature;
+                      // Direct match on task_type column
+                      if (featureData.task_type && taskTypeFilter.includes(featureData.task_type)) {
+                        hasMatchingFeature = true;
+                        break;
+                      }
+                    }
                   }
                 }
+                if (hasMatchingFeature) break;
               }
             }
-
             if (hasMatchingFeature) break;
           }
         }
@@ -518,8 +565,13 @@ export default function ProductTable({
         newExpandedItems[`product-${product.id}`] = true;
 
         if (product.children && Array.isArray(product.children)) {
-          for (const component of product.children) {
-            newExpandedItems[`component-${component.id}`] = true;
+          for (const subproduct of product.children) {
+            newExpandedItems[`subproduct-${subproduct.id}`] = true;
+            if (subproduct.children && Array.isArray(subproduct.children)) {
+              for (const component of subproduct.children) {
+                newExpandedItems[`component-${component.id}`] = true;
+              }
+            }
           }
         }
       }
@@ -768,42 +820,23 @@ export default function ProductTable({
   // Update component progress based on actual feature progress values
   async function updateComponentProgress(componentId: string) {
     try {
-      // Get all features for this component with team filter applied
-      let featuresQuery = supabase
+      // Get all features for this component
+      const { data: features, error: featuresError } = await supabase
         .from('pb_features')
-        .select('progress, team, version')
+        .select('progress')
         .eq('component_id', componentId);
-
-      if (teamFilter && teamFilter.length > 0) {
-        featuresQuery = featuresQuery.in('team', teamFilter);
-      }
-
-      if (versionFilter && versionFilter.length > 0) {
-        featuresQuery = featuresQuery.in('version', versionFilter);
-      }
-
-      const { data: filteredFeatures, error: featuresError } = await featuresQuery;
 
       if (featuresError) throw featuresError;
 
-      if (filteredFeatures.length === 0) {
-        return 0;
-      }
+      if (features.length === 0) return 0;
 
-      // Calculate progress based on actual progress values
-      const totalProgress = filteredFeatures.reduce((sum, feature) => {
-        return sum + (feature.progress || 0);
-      }, 0);
+      const totalProgress = features.reduce((sum, feature) => sum + (feature.progress || 0), 0);
+      const averageProgress = Math.round(totalProgress / features.length);
 
-      const averageProgress = Math.round(totalProgress / filteredFeatures.length);
-
-      // Update the component's progress directly in the database
-      const { error: updateError } = await supabase
+      await supabase
         .from('pb_components')
         .update({ progress: averageProgress })
         .eq('id', componentId);
-
-      if (updateError) throw updateError;
 
       return averageProgress;
     } catch (error) {
@@ -812,57 +845,52 @@ export default function ProductTable({
     }
   }
 
-  // Update product progress based on its components
-  async function updateProductProgress(productId: string) {
+  // Update subproduct progress based on its components
+  async function updateSubproductProgress(subproductId: string) {
     try {
-      // Get all components for this product
       const { data: components, error: componentsError } = await supabase
         .from('pb_components')
-        .select('id, progress')
-        .eq('product_id', productId);
+        .select('progress')
+        .eq('subproduct_id', subproductId);
 
       if (componentsError) throw componentsError;
 
-      // First update the progress of each component
-      for (const component of components) {
-        await updateComponentProgress(component.id);
-      }
+      if (components.length === 0) return 0;
 
-      // Get the updated components
-      const { data: updatedComponents, error: updatedError } = await supabase
-        .from('pb_components')
+      const totalProgress = components.reduce((sum, component) => sum + (component.progress || 0), 0);
+      const averageProgress = Math.round(totalProgress / components.length);
+
+      await supabase
+        .from('pb_subproducts')
+        .update({ progress: averageProgress })
+        .eq('id', subproductId);
+
+      return averageProgress;
+    } catch (error) {
+      console.error('Error updating subproduct progress:', error);
+      throw error;
+    }
+  }
+
+  // Update product progress based on its subproducts
+  async function updateProductProgress(productId: string) {
+    try {
+      const { data: subproducts, error: subproductsError } = await supabase
+        .from('pb_subproducts')
         .select('progress')
         .eq('product_id', productId);
 
-      if (updatedError) throw updatedError;
-      // Calculate the product's progress as the average of its components
-      const componentsWithProgress = updatedComponents.filter(c => c.progress !== null && c.progress !== undefined);
+      if (subproductsError) throw subproductsError;
 
-      let averageProgress = 0;
-      if (componentsWithProgress.length > 0) {
-        const totalProgress = componentsWithProgress.reduce((sum, component) => {
-          return sum + (typeof component.progress === 'number' && !isNaN(component.progress) ? component.progress : 0);
-        }, 0);
+      if (subproducts.length === 0) return 0;
 
-        averageProgress = Math.round(totalProgress / componentsWithProgress.length);
-      }
+      const totalProgress = subproducts.reduce((sum, subproduct) => sum + (subproduct.progress || 0), 0);
+      const averageProgress = Math.round(totalProgress / subproducts.length);
 
-      // Update the product progress in the database
-      const { error: updateError } = await supabase
+      await supabase
         .from('pb_products')
         .update({ progress: averageProgress })
         .eq('id', productId);
-
-      if (updateError) throw updateError;
-
-      // Update the product in the UI
-      setTableData(prevData =>
-        prevData.map(item =>
-          item.id === productId
-            ? { ...item, data: { ...item.data, progress: averageProgress } }
-            : item
-        )
-      );
 
       return averageProgress;
     } catch (error) {
@@ -1093,14 +1121,14 @@ export default function ProductTable({
     setIsFeatureDetailOpen(false);
   };
 
-  const handleCreateComponentClick = (productId: string) => {
-    setSelectedProductIdForComponent(productId);
+  const handleCreateComponentClick = (subproductId: string) => {
+    setSelectedSubproductIdForComponent(subproductId);
     setIsCreateComponentModalOpen(true);
   };
 
-  const handleEditComponent = (componentId: string, productId: string) => {
+  const handleEditComponent = (componentId: string, subproductId: string) => {
     setEditingComponentId(componentId);
-    setSelectedProductIdForComponent(productId);
+    setSelectedSubproductIdForComponent(subproductId);
     setIsCreateComponentModalOpen(true);
   };
 
@@ -1113,6 +1141,26 @@ export default function ProductTable({
     setEditingFeatureId(featureId);
     setSelectedComponentIdForFeature(componentId);
     setIsCreateFeatureModalOpen(true);
+  };
+
+  const handleCreateSubproductClick = (productId: string) => {
+    setSelectedProductIdForSubproduct(productId);
+    setSelectedSubproductId(null);
+    setSelectedSubproductData(null);
+    setIsSubproductSidesheetOpen(true);
+  };
+
+  const handleEditSubproduct = (subproductId: string, productId: string) => {
+    setSelectedSubproductId(subproductId);
+    setSelectedProductIdForSubproduct(productId);
+    setIsSubproductSidesheetOpen(true);
+  };
+
+  const handleSubproductSelection = (subproduct: TableItem) => {
+    setSelectedSubproductId(subproduct.id);
+    setSelectedSubproductData(subproduct.data as Subproduct);
+    setSelectedProductIdForSubproduct((subproduct.data as Subproduct).product_id);
+    setIsSubproductSidesheetOpen(true);
   };
 
   async function createNewProduct(name: string, status: string = 'Todo', progress: number = 0, version: string = '1.0.0') {
@@ -1141,88 +1189,57 @@ export default function ProductTable({
     }
   }
 
-  async function createNewComponent(newComponent: any, productId: string) {
+  async function createNewComponent(newComponent: any, subproductId: string) {
     const newComponentItem: TableItem = {
       type: "component",
       id: newComponent.id,
       name: newComponent.name,
-      level: 1,
+      level: 2,
       data: newComponent,
     };
 
     setTableData((prevData) =>
-      prevData.map((item) =>
-        item.type === "product" && item.id === productId
-          ? {
-            ...item,
-            children: [...(item.children || []), newComponentItem],
-          }
-          : item
-      )
+      prevData.map((p) => ({
+        ...p,
+        children: p.children?.map((s) =>
+          s.id === subproductId
+            ? { ...s, children: [...(s.children || []), newComponentItem] }
+            : s
+        ),
+      }))
     );
 
     setAllTableData((prevData) =>
-      prevData.map((item) =>
-        item.type === "product" && item.id === productId
-          ? {
-            ...item,
-            children: [...(item.children || []), newComponentItem],
-          }
-          : item
-      )
+      prevData.map((p) => ({
+        ...p,
+        children: p.children?.map((s) =>
+          s.id === subproductId
+            ? { ...s, children: [...(s.children || []), newComponentItem] }
+            : s
+        ),
+      }))
     );
 
-    setExpandedItems((prev) => {
-      const updatedExpanded = { ...prev };
-      updatedExpanded[`product-${productId}`] = true;
-      return updatedExpanded;
-    });
+    setExpandedItems((prev) => ({
+      ...prev,
+      [`subproduct-${subproductId}`]: true,
+    }));
 
-    // Refresh the product's progress after creating a new component
-    const refreshProductProgress = async () => {
-      try {
-        console.log(`Refreshing product progress for product ${productId} after component creation`);
-        const response = await fetch(`/api/product/${productId}`);
-        if (response.ok) {
-          const updatedProduct = await response.json();
-          console.log('Updated product data after component creation:', updatedProduct);
-
-          // Update the product in the table data
-          setTableData((prevData) =>
-            prevData.map((item) =>
-              item.type === "product" && item.id === productId
-                ? { ...item, data: updatedProduct, name: updatedProduct.name }
-                : item
-            )
-          );
-          setAllTableData((prevData) =>
-            prevData.map((item) =>
-              item.type === "product" && item.id === productId
-                ? { ...item, data: updatedProduct, name: updatedProduct.name }
-                : item
-            )
-          );
-        }
-      } catch (error) {
-        console.error('Error refreshing product progress after component creation:', error);
-      }
-    };
-
-    // Call the refresh function
-    refreshProductProgress();
+    // Refresh progress
+    fetchProducts();
 
     setIsCreateComponentModalOpen(false);
-    setSelectedProductIdForComponent(null);
+    setSelectedSubproductIdForComponent(null);
   }
 
-  async function createNewInlineComponent(name: string, productId: string) {
+  async function createNewInlineComponent(name: string, subproductId: string) {
     try {
       const response = await fetch('/api/component', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          product_id: productId,
+          subproduct_id: subproductId,
           updateProductProgress: true,
         }),
       });
@@ -1233,7 +1250,7 @@ export default function ProductTable({
       }
 
       const newComponent = await response.json();
-      createNewComponent(newComponent, productId);
+      createNewComponent(newComponent, subproductId);
     } catch (error) {
       console.error("Error creating component:", error);
     }
@@ -1244,57 +1261,42 @@ export default function ProductTable({
       type: "feature",
       id: newFeature.id,
       name: newFeature.name,
-      level: 2,
+      level: 3,
       data: newFeature,
     };
 
     setTableData((prevData) =>
-      prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === componentId
-                ? {
-                  ...child,
-                  children: [...(child.children || []), newFeatureItem],
-                }
-                : child
-            ),
-          }
-          : item
-      )
+      prevData.map((p) => ({
+        ...p,
+        children: p.children?.map((s) => ({
+          ...s,
+          children: s.children?.map((c) =>
+            c.id === componentId
+              ? { ...c, children: [...(c.children || []), newFeatureItem] }
+              : c
+          ),
+        })),
+      }))
     );
 
     setAllTableData((prevData) =>
-      prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === componentId
-                ? {
-                  ...child,
-                  children: [...(child.children || []), newFeatureItem],
-                }
-                : child
-            ),
-          }
-          : item
-      )
+      prevData.map((p) => ({
+        ...p,
+        children: p.children?.map((s) => ({
+          ...s,
+          children: s.children?.map((c) =>
+            c.id === componentId
+              ? { ...c, children: [...(c.children || []), newFeatureItem] }
+              : c
+          ),
+        })),
+      }))
     );
 
-    setExpandedItems((prev) => {
-      const updatedExpanded = { ...prev };
-      const parentProduct = allTableData.find((p) =>
-        p.children?.some((c) => c.id === componentId)
-      );
-      if (parentProduct) {
-        updatedExpanded[`product-${parentProduct.id}`] = true;
-        updatedExpanded[`component-${componentId}`] = true;
-      }
-      return updatedExpanded;
-    });
+    setExpandedItems((prev) => ({
+      ...prev,
+      [`component-${componentId}`]: true,
+    }));
 
     // Refresh the component's progress after creating a new feature
     const refreshComponentProgress = async () => {
@@ -1347,28 +1349,44 @@ export default function ProductTable({
     setSelectedComponentIdForFeature(null);
   }
 
-  async function fetchComponents(productId: string) {
+  async function fetchSubproducts(productId: string) {
     try {
-      const { data: componentsData, error: componentsError } = await supabase
-        .from("pb_components")
+      const { data: subproductsData, error } = await supabase
+        .from("pb_subproducts")
         .select("*")
         .eq("product_id", productId);
 
-      if (componentsError) {
-        console.error("Supabase error fetching components:", componentsError);
-        throw componentsError;
-      }
+      if (error) throw error;
 
+      return subproductsData.map((subproduct) => ({
+        type: "subproduct",
+        id: subproduct.id,
+        name: subproduct.name || "Subproduct",
+        level: 1,
+        data: subproduct,
+      }));
+    } catch (error) {
+      console.error("Error fetching subproducts:", error);
+      return [];
+    }
+  }
 
-      const mappedComponents = componentsData.map((component) => ({
+  async function fetchComponents(subproductId: string) {
+    try {
+      const { data: componentsData, error } = await supabase
+        .from("pb_components")
+        .select("*")
+        .eq("subproduct_id", subproductId);
+
+      if (error) throw error;
+
+      return componentsData.map((component) => ({
         type: "component",
         id: component.id,
         name: component.name || "Component",
-        level: 1,
+        level: 2,
         data: component,
       }));
-
-      return mappedComponents;
     } catch (error) {
       console.error("Error fetching components:", error);
       return [];
@@ -1377,26 +1395,20 @@ export default function ProductTable({
 
   async function fetchFeatures(componentId: string) {
     try {
-      const { data: featuresData, error: featuresError } = await supabase
+      const { data: featuresData, error } = await supabase
         .from("pb_features")
         .select("*")
         .eq("component_id", componentId);
 
-      if (featuresError) {
-        console.error("Supabase error fetching features:", featuresError);
-        throw featuresError;
-      }
+      if (error) throw error;
 
-
-      const mappedFeatures = featuresData.map((feature) => ({
+      return featuresData.map((feature) => ({
         type: "feature",
         id: feature.id,
         name: feature.name || "Feature",
-        level: 2,
+        level: 3,
         data: feature,
       }));
-
-      return mappedFeatures;
     } catch (error) {
       console.error("Error fetching features:", error);
       return [];
@@ -1405,7 +1417,7 @@ export default function ProductTable({
   const toggleExpand = async (
     type: string,
     id: string,
-    data: Product | Component
+    data: Product | Subproduct | Component
   ) => {
     const newExpandedState = !expandedItems[`${type}-${id}`];
     setExpandedItems((prev) => ({
@@ -1415,30 +1427,14 @@ export default function ProductTable({
 
     if (newExpandedState) {
       if (type === "product") {
-        const product = tableData.find((item) => item.id === id);
-        // Only fetch if children haven't been loaded yet (undefined, not empty array)
-        if (!product?.children) {
-          // Set loading state
+        const item = tableData.find((i) => i.id === id);
+        if (!item?.children) {
           setLoadingItems(prev => new Set(prev).add(`product-${id}`));
-
           try {
-            const components = await fetchComponents(id);
-
-            setTableData((prevData) =>
-              prevData.map((item) =>
-                item.id === id ? { ...item, children: components as TableItem[] } : item
-              )
-            );
-
-            setAllTableData((prevAllData) =>
-              prevAllData.map((item) =>
-                item.id === id ? { ...item, children: components as TableItem[] } : item
-              )
-            );
-          } catch (error) {
-            console.error('Error fetching components:', error);
+            const subproducts = await fetchSubproducts(id);
+            setTableData(prev => prev.map(i => i.id === id ? { ...i, children: subproducts as TableItem[] } : i));
+            setAllTableData(prev => prev.map(i => i.id === id ? { ...i, children: subproducts as TableItem[] } : i));
           } finally {
-            // Clear loading state
             setLoadingItems(prev => {
               const newSet = new Set(prev);
               newSet.delete(`product-${id}`);
@@ -1446,63 +1442,63 @@ export default function ProductTable({
             });
           }
         }
-      } else if (type === "component") {
-        let componentFound = false;
-        let productId = null;
-        let componentHasFeatures = false;
-
-        tableData.forEach((product) => {
-          if (product.children) {
-            const componentIndex = product.children.findIndex(
-              (comp) => comp.id === id
-            );
-            if (componentIndex >= 0) {
-              componentFound = true;
-              productId = product.id;
-              // Check if component already has features loaded (children property exists)
-              componentHasFeatures = product.children[componentIndex].children !== undefined;
-            }
+      } else if (type === "subproduct") {
+        let subproductItem: TableItem | null = null;
+        tableData.forEach(p => {
+          if (p.children) {
+            const found = p.children.find(s => s.id === id);
+            if (found) subproductItem = found;
           }
         });
 
-        if (componentFound && productId && !componentHasFeatures) {
-          // Set loading state only if features aren't already loaded
-          setLoadingItems(prev => new Set(prev).add(`component-${id}`));
+        if (subproductItem && !(subproductItem as any).children) {
+          setLoadingItems(prev => new Set(prev).add(`subproduct-${id}`));
+          try {
+            const components = await fetchComponents(id);
+            setTableData(prev => prev.map(p => ({
+              ...p,
+              children: p.children?.map(s => s.id === id ? { ...s, children: components as TableItem[] } : s)
+            })));
+            setAllTableData(prev => prev.map(p => ({
+              ...p,
+              children: p.children?.map(s => s.id === id ? { ...s, children: components as TableItem[] } : s)
+            })));
+          } finally {
+            setLoadingItems(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(`subproduct-${id}`);
+              return newSet;
+            });
+          }
+        }
+      } else if (type === "component") {
+        let componentItem: TableItem | null = null;
+        tableData.forEach(p => {
+          p.children?.forEach(s => {
+            const found = s.children?.find(c => c.id === id);
+            if (found) componentItem = found;
+          });
+        });
 
+        if (componentItem && !(componentItem as any).children) {
+          setLoadingItems(prev => new Set(prev).add(`component-${id}`));
           try {
             const features = await fetchFeatures(id);
-
-            setTableData((prevData) =>
-              prevData.map((product) => {
-                if (product.children) {
-                  return {
-                    ...product,
-                    children: product.children.map((comp) =>
-                      comp.id === id ? { ...comp, children: features as TableItem[] } : comp
-                    ) as TableItem[],
-                  };
-                }
-                return product;
-              })
-            );
-
-            setAllTableData((prevAllData) =>
-              prevAllData.map((product) => {
-                if (product.children) {
-                  return {
-                    ...product,
-                    children: product.children.map((comp) =>
-                      comp.id === id ? { ...comp, children: features as TableItem[] } : comp
-                    ) as TableItem[],
-                  };
-                }
-                return product;
-              })
-            );
-          } catch (error) {
-            console.error('Error fetching features:', error);
+            setTableData(prev => prev.map(p => ({
+              ...p,
+              children: p.children?.map(s => ({
+                ...s,
+                children: s.children?.map(c => c.id === id ? { ...c, children: features as TableItem[] } : c)
+              }))
+            })));
+            setAllTableData(prev => prev.map(p => ({
+              ...p,
+              children: p.children?.map(s => ({
+                ...s,
+                children: s.children?.map(c => c.id === id ? { ...c, children: features as TableItem[] } : c)
+              }))
+            })));
           } finally {
-            // Remove loading state
             setLoadingItems(prev => {
               const newSet = new Set(prev);
               newSet.delete(`component-${id}`);
@@ -1534,14 +1530,14 @@ export default function ProductTable({
     setNewProductName("");
   };
 
-  const handleSaveNewComponent = (productId: string) => {
+  const handleSaveNewComponent = (subproductId: string) => {
     if (newComponentName.trim()) {
-      createNewInlineComponent(newComponentName.trim(), productId);
+      createNewInlineComponent(newComponentName.trim(), subproductId);
     }
   };
 
   const handleCancelNewComponent = () => {
-    setCreatingComponentForProduct(null);
+    setCreatingComponentForSubproduct(null);
     setNewComponentName("");
   };
   // Helper to calculate average progress for children, with option to exclude empty children (for product progress)
@@ -1563,479 +1559,180 @@ export default function ProductTable({
   }
 
   const renderChildren = (children: TableItem[] = []): JSX.Element[] => {
-    return children.map((child) => (
-      <React.Fragment key={child.id}>
-        <TableRow className={`hover:bg-gray-50 ${child.level === 2 ? 'bg-white' : 'bg-blue-50'}`}>
-          {visibleColumns.name && (
-            <TableCell className="w-[417px] p-2 border-r border-gray-200">
-              <div className="flex items-center gap-2" style={{ paddingLeft: `${(child.level + 1) * 16}px` }}>
+    return children.flatMap((child) => [
+      <TableRow key={child.id} className={`hover:bg-gray-50 ${child.level === 3 ? 'bg-white' : 'bg-blue-50'}`}>
+        {visibleColumns.name && (
+          <TableCell className="w-[417px] p-2 border-r border-gray-200">
+            <div className="flex items-center gap-2" style={{ paddingLeft: `${(child.level + 1) * 16}px` }}>
+              <div
+                className="flex items-center gap-2 cursor-pointer w-full"
+                onClick={() => {
+                  if (child.type !== "feature") {
+                    toggleExpand(child.type, child.id, child.data as any);
+                  }
+                }}
+              >
+                {child.type !== 'feature' && (
+                  loadingItems.has(`${child.type}-${child.id}`) ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  ) : isExpanded(child.type, child.id) ? (
+                    <ChevronDown size={18} className="text-gray-500" />
+                  ) : (
+                    <ChevronRight size={18} className="text-gray-500" />
+                  )
+                )}
                 <div
-                  className="flex items-center gap-2 cursor-pointer w-full"
-                  onClick={() => {
-                    if (child.type === "product" || child.type === "component") {
-                      toggleExpand(child.type, child.id, child.data);
-                    }
+                  className={`flex items-center gap-2 cursor-pointer w-full ${child.type === "feature" ? "text-gray-600" : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (child.type === "subproduct") handleSubproductSelection(child);
+                    else if (child.type === "component") handleComponentSelection(child);
+                    else if (child.type === "feature") handleFeatureSelection(child);
                   }}
                 >
-                  {child.level < 2 && (
-                    loadingItems.has(`${child.type}-${child.id}`) ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    ) : isExpanded(child.type, child.id) ? (
-                      <ChevronDown size={18} className="text-gray-500" />
-                    ) : (
-                      <ChevronRight size={18} className="text-gray-500" />
-                    )
-                  )}
-                  <div
-                    className={`flex items-center gap-2 cursor-pointer w-full ${child.type === "component" || child.type === "feature"
-                        ? "text-gray-600"
-                        : ""
-                      }`}
-                    onClick={(e) => {
-                      if (child.type === "component") {
-                        e.stopPropagation();
-                        handleComponentSelection(child);
-                      } else if (child.type === "feature") {
-                        e.stopPropagation();
-                        handleFeatureSelection(child);
-                      }
-                    }}
-                  >
-                    {child.level === 1 && (
-                      <span className="p-1 bg-white text-gray-500 rounded-md border border-gray-200">
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <rect x="3" y="3" width="7" height="7" rx="1" />
-                          <rect x="14" y="3" width="7" height="7" rx="1" />
-                          <rect x="3" y="14" width="7" height="7" rx="1" />
-                          <rect x="14" y="14" width="7" height="7" rx="1" />
-                        </svg>
-                      </span>
-                    )}
-                    {child.level === 2 && (
-                      <div className={`${child.data.status === 'Completed' ? 'text-green-600' :
-                          child.data.status === 'In Progress' ? 'text-yellow-600' :
-                            child.data.status === 'Todo' ? 'text-gray-600' : 'text-gray-600'
-                        }`}>
-                        <svg height="16px" width="16px" viewBox="0 0 16 16" role="img" aria-label="TaskFilledIcon">
-                          <path fill="currentColor" d="M8 15.5a7.5 7.5 0 0 0 6.365-11.47L8.53 9.87a.75.75 0 0 1-1.061 0l-2-2a.75.75 0 0 1 1.06-1.06L8 8.28l5.438-5.445A7.5 7.5 0 1 0 8 15.5"></path>
-                        </svg>
-                      </div>
-                    )}
-                    <span
-                      className={`cursor-pointer ${child.type === "component"
-                          ? "hover:text-blue-600"
-                          : child.type === "feature"
-                            ? "hover:text-blue-600"
-                            : ""
-                        } text-gray-700 text-[14px] font-medium truncate block`}
-                      onClick={(e) => {
-                        if (child.type === "component") {
-                          e.stopPropagation();
-                          handleComponentSelection(child);
-                        } else if (child.type === "feature") {
-                          e.stopPropagation();
-                          handleFeatureSelection(child);
-                        }
-                      }}
-                    >
-                      {child.name}
+                  {child.type === "subproduct" && (
+                    <span className="p-1 bg-white text-blue-500 rounded-md border border-gray-200">
+                      <Settings size={16} />
                     </span>
-                  </div>
+                  )}
+                  {child.type === "component" && (
+                    <span className="p-1 bg-white text-gray-500 rounded-md border border-gray-200">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                      </svg>
+                    </span>
+                  )}
+                  {child.type === "feature" && (
+                    <div className={`${child.data.status === 'Completed' ? 'text-green-600' : 'text-gray-600'}`}>
+                      <svg height="16px" width="16px" viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M8 15.5a7.5 7.5 0 0 0 6.365-11.47L8.53 9.87a.75.75 0 0 1-1.061 0l-2-2a.75.75 0 0 1 1.06-1.06L8 8.28l5.438-5.445A7.5 7.5 0 1 0 8 15.5"></path>
+                      </svg>
+                    </div>
+                  )}
+                  <span className="text-gray-700 text-[14px] font-medium truncate block hover:text-blue-600">
+                    {child.name}
+                  </span>
                 </div>
-                {/* Add the Plus button only for components (level 1) to create features */}
-                {child.level === 1 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCreateFeatureClick(child.id);
-                          }}
-                          className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors"
-                        >
-                          <img className="w-4 h-4" src="/add.svg" alt="Add" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="center">
-                        Add feature
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
               </div>
-            </TableCell>
-          )}
-          {visibleColumns.progress && (
-            <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <div className="flex items-center justify-center gap-2 overflow-visible" title={versionFilter && versionFilter.length > 0 ? `Version ${versionFilter[0]} Progress` : child.type === "component" ? "Component Progress" : "Feature Progress"}>
-                <div className="relative w-7 h-7 overflow-visible">
-                  <svg className="w-7 h-7 transform -rotate-90 overflow-visible" viewBox="0 0 50 50">
-                    <circle
-                      cx="25"
-                      cy="25"
-                      r="18"
-                      fill="none"
-                      stroke="#e5e7eb"
-                      strokeWidth="12"
-                    />
-                    <circle
-                      cx="25"
-                      cy="25"
-                      r="18"
-                      fill="none"
-                      stroke={getProgressColor(getProgressValue(child))}
-                      strokeWidth="12"
-                      strokeDasharray={`${(getProgressValue(child) / 100) * 113.04}, 113.04`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-                <span className="text-xs font-medium w-8 text-left">
-                  {getProgressValue(child)}%
-                </span>
+              {child.type === "subproduct" && (
+                <button onClick={(e) => { e.stopPropagation(); handleCreateComponentClick(child.id); }} className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors">
+                  <img className="w-4 h-4" src="/add.svg" alt="Add Component" />
+                </button>
+              )}
+              {child.type === "component" && (
+                <button onClick={(e) => { e.stopPropagation(); handleCreateFeatureClick(child.id); }} className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors">
+                  <img className="w-4 h-4" src="/add.svg" alt="Add Feature" />
+                </button>
+              )}
+            </div>
+          </TableCell>
+        )}
+        {visibleColumns.progress && (
+          <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
+            <div className="flex items-center justify-center gap-2">
+              <div className="relative w-7 h-7">
+                <svg className="w-7 h-7 transform -rotate-90" viewBox="0 0 50 50">
+                  <circle cx="25" cy="25" r="18" fill="none" stroke="#e5e7eb" strokeWidth="12" />
+                  <circle cx="25" cy="25" r="18" fill="none" stroke={getProgressColor(getProgressValue(child))} strokeWidth="12" strokeDasharray={`${(getProgressValue(child) / 100) * 113.04}, 113.04`} strokeLinecap="round" />
+                </svg>
               </div>
-            </TableCell>
-          )}
-          {visibleColumns.version && (
-            <TableCell className="w-[100px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              {child.data.version || "1.0.0"}
-            </TableCell>
-          )}
-          {visibleColumns.status && (
-            <TableCell className="w-[130px] text-center text-[12px] text-gray-700 border-r border-gray-200">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${child.data.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                  child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                    child.data.status === 'Todo' ? 'bg-gray-100 text-gray-800' :
-                      isValidStatus(child.data.status) ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
-                }`}>
-                {child?.data?.status || "-"}
-              </span>
-            </TableCell>
-          )}
-          {visibleColumns.team && (
-            <TableCell className="w-[144px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.data.team || "-"}
-            </TableCell>
-          )}
-          {visibleColumns.days && (
-            <TableCell className="w-[112px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.data.days !== undefined ? child.data.days : "-"}
-            </TableCell>
-          )}
-          {visibleColumns.startDate && (
-            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {(() => {
-                const startDate = child.data.startdate;
-                if (!startDate) return "-";
-                if (typeof startDate === 'string') return startDate;
-                return (startDate as Date).toISOString().split('T')[0];
-              })()}
-            </TableCell>
-          )}
-          {visibleColumns.targetDate && (
-            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {(() => {
-                const endDate = child.data.targetdate;
-                if (!endDate) return "-";
-                if (typeof endDate === 'string') return endDate;
-                return (endDate as Date).toISOString().split('T')[0];
-              })()}
-            </TableCell>
-          )}
-          {visibleColumns.taskType && (
-            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.type === "feature" && (child.data as Feature).task_type ? (
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {(child.data as Feature).task_type}
-                </span>
-              ) : (
-                "-"
-              )}
-            </TableCell>
-          )}
-          {visibleColumns.subTaskType && (
-            <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.type === "feature" && (child.data as Feature).sub_task_type ? (
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {(child.data as Feature).sub_task_type}
-                </span>
-              ) : (
-                "-"
-              )}
-            </TableCell>
-          )}
-          {visibleColumns.completedon && (
-            <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              {child.data.completedon || "-"}
-            </TableCell>
-          )}
-          {visibleColumns.remarks && (
-            <TableCell className="w-[300px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-              <span className="truncate block">{child.data.remarks || "-"}</span>
-            </TableCell>
-          )}
-          {visibleColumns.description && (
-            <TableCell className="w-[300px] text-center text-[14px] text-gray-700">
-              <span className="break-words whitespace-normal text-left">{child.data.description || "-"}</span>
-            </TableCell>
-          )}
-        </TableRow>
-        {/* Recursively render nested children (features under components) */}
-        {child.children &&
-          isExpanded(child.type, child.id) &&
-          renderChildren(child.children)}
-      </React.Fragment>
-    ));
+              <span className="text-xs font-medium w-8">{getProgressValue(child)}%</span>
+            </div>
+          </TableCell>
+        )}
+        {visibleColumns.version && <TableCell className="w-[100px] text-center text-[12px] border-r">{child.data.version || "1.0.0"}</TableCell>}
+        {visibleColumns.status && (
+          <TableCell className="w-[130px] text-center border-r">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${child.data.status === 'Completed' ? 'bg-green-100 text-green-800' : child.data.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+              {child.data.status || "-"}
+            </span>
+          </TableCell>
+        )}
+        {visibleColumns.team && <TableCell className="w-[144px] text-center border-r">{child.data.team || "-"}</TableCell>}
+        {visibleColumns.days && <TableCell className="w-[112px] text-center border-r">{child.data.days ?? "-"}</TableCell>}
+        {visibleColumns.startDate && <TableCell className="w-[120px] text-center border-r">{(child.data as any).startdate || "-"}</TableCell>}
+        {visibleColumns.targetDate && <TableCell className="w-[120px] text-center border-r">{(child.data as any).targetdate || "-"}</TableCell>}
+        {visibleColumns.taskType && <TableCell className="w-[120px] text-center border-r">{child.type === "feature" ? (child.data as Feature).task_type || "-" : "-"}</TableCell>}
+        {visibleColumns.subTaskType && <TableCell className="w-[120px] text-center border-r">{child.type === "feature" ? (child.data as Feature).sub_task_type || "-" : "-"}</TableCell>}
+        {visibleColumns.completedon && <TableCell className="w-[170px] text-center border-r">{child.data.completedon || "-"}</TableCell>}
+        {visibleColumns.remarks && <TableCell className="w-[300px] text-center border-r truncate">{child.data.remarks || "-"}</TableCell>}
+        {visibleColumns.description && <TableCell className="w-[300px] text-center">{child.data.description || "-"}</TableCell>}
+      </TableRow>,
+      ...(child.children && isExpanded(child.type, child.id) ? renderChildren(child.children) : [])
+    ]);
   };
 
   if (loading && allTableData.length === 0) {
     return <ProductTableSkeleton />;
   }
-  // When a feature is updated, ensure its parent component is expanded
+
+  const handleProductUpdated = (updatedProduct: Product) => {
+    console.log('Updating product in table:', updatedProduct);
+    const updateInList = (list: TableItem[]) => 
+      list.map(item => item.type === "product" && item.id === updatedProduct.id 
+        ? { ...item, data: updatedProduct, name: updatedProduct.name } 
+        : item
+      );
+    setTableData(prev => updateInList(prev));
+    setAllTableData(prev => updateInList(prev));
+    fetchProducts();
+  };
+  
+  const handleSubproductUpdated = (updatedSubproduct: Subproduct) => {
+    console.log('Updating subproduct in table:', updatedSubproduct);
+    const updateInList = (list: TableItem[]) => 
+      list.map(p => ({
+        ...p,
+        children: p.children?.map(s => s.id === updatedSubproduct.id 
+          ? { ...s, data: updatedSubproduct, name: updatedSubproduct.name } 
+          : s
+        )
+      }));
+    setTableData(prev => updateInList(prev));
+    setAllTableData(prev => updateInList(prev));
+    fetchProducts();
+  };
+
   const handleComponentUpdated = (updatedComponent: Component) => {
     console.log('Updating component in table:', updatedComponent);
-
-    // Force immediate UI update
-    setTableData((prevData) => {
-      const updated = prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === updatedComponent.id
-                ? { ...child, data: updatedComponent, name: updatedComponent.name }
-                : child
-            ),
-          }
-          : item
-      );
-      console.log('Updated tableData:', updated);
-      return updated;
-    });
-
-    setAllTableData((prevData) => {
-      const updated = prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === updatedComponent.id
-                ? { ...child, data: updatedComponent, name: updatedComponent.name }
-                : child
-            ),
-          }
-          : item
-      );
-      console.log('Updated allTableData:', updated);
-      return updated;
-    });
-
-    // Force a re-render
-    triggerForceRefresh();
-
-    // Refresh the component's progress by fetching updated component data
-    const refreshComponentProgress = async () => {
-      try {
-        console.log(`Refreshing component progress for component ${updatedComponent.id}`);
-        const response = await fetch(`/api/component/${updatedComponent.id}`);
-        if (response.ok) {
-          const updatedComponentData = await response.json();
-          console.log('Updated component data:', updatedComponentData);
-
-          // Update the component in the table data
-          setTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.children
-                ? {
-                  ...item,
-                  children: item.children.map((child) =>
-                    child.id === updatedComponent.id
-                      ? { ...child, data: updatedComponentData, name: updatedComponentData.name }
-                      : child
-                  ),
-                }
-                : item
-            );
-            console.log('Component progress updated in tableData:', updated);
-            return updated;
-          });
-
-          setAllTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.children
-                ? {
-                  ...item,
-                  children: item.children.map((child) =>
-                    child.id === updatedComponent.id
-                      ? { ...child, data: updatedComponentData, name: updatedComponentData.name }
-                      : child
-                  ),
-                }
-                : item
-            );
-            console.log('Component progress updated in allTableData:', updated);
-            return updated;
-          });
-        }
-      } catch (error) {
-        console.error('Error refreshing component progress:', error);
-      }
-    };
-
-    // Refresh the product's progress by fetching updated product data
-    const refreshProductProgress = async () => {
-      try {
-        console.log(`Refreshing product progress for product ${updatedComponent.product_id}`);
-        const response = await fetch(`/api/product/${updatedComponent.product_id}`);
-        if (response.ok) {
-          const updatedProduct = await response.json();
-          console.log('Updated product data:', updatedProduct);
-
-          // Update the product in the table data with force refresh
-          setTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.id === updatedComponent.product_id
-                ? { ...item, data: updatedProduct, name: updatedProduct.name }
-                : item
-            );
-            console.log('Product progress updated in tableData:', updated);
-            return updated;
-          });
-
-          setAllTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.id === updatedComponent.product_id
-                ? { ...item, data: updatedProduct, name: updatedProduct.name }
-                : item
-            );
-            console.log('Product progress updated in allTableData:', updated);
-            return updated;
-          });
-        }
-      } catch (error) {
-        console.error('Error refreshing product progress:', error);
-      }
-    };
-
-    // Call both refresh functions
-    refreshComponentProgress();
-    refreshProductProgress();
+    const updateInList = (list: TableItem[]) => 
+      list.map(p => ({
+        ...p,
+        children: p.children?.map(s => ({
+          ...s,
+          children: s.children?.map(c => c.id === updatedComponent.id 
+            ? { ...c, data: updatedComponent, name: updatedComponent.name } 
+            : c
+          )
+        }))
+      }));
+    setTableData(prev => updateInList(prev));
+    setAllTableData(prev => updateInList(prev));
+    fetchProducts();
   };
 
   const handleFeatureUpdated = (updatedFeature: Feature) => {
     console.log('Updating feature in table:', updatedFeature);
-
-    // Force immediate UI update
-    setTableData((prevData) => {
-      const updated = prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === updatedFeature.component_id && child.children
-                ? {
-                  ...child,
-                  children: child.children.map((feature) =>
-                    feature.id === updatedFeature.id
-                      ? { ...feature, data: updatedFeature, name: updatedFeature.name }
-                      : feature
-                  ),
-                }
-                : child
-            ),
-          }
-          : item
-      );
-      console.log('Updated tableData with feature:', updated);
-      return updated;
-    });
-
-    setAllTableData((prevData) => {
-      const updated = prevData.map((item) =>
-        item.type === "product" && item.children
-          ? {
-            ...item,
-            children: item.children.map((child) =>
-              child.id === updatedFeature.component_id && child.children
-                ? {
-                  ...child,
-                  children: child.children.map((feature) =>
-                    feature.id === updatedFeature.id
-                      ? { ...feature, data: updatedFeature, name: updatedFeature.name }
-                      : feature
-                  ),
-                }
-                : child
-            ),
-          }
-          : item
-      );
-      console.log('Updated allTableData with feature:', updated);
-      return updated;
-    });
-
-    // Force a re-render
-    triggerForceRefresh();
-
-    // Refresh the component's progress by fetching updated component data
-    const refreshComponentProgress = async () => {
-      try {
-        console.log(`Refreshing component progress for component ${updatedFeature.component_id}`);
-        const response = await fetch(`/api/component/${updatedFeature.component_id}`);
-        if (response.ok) {
-          const updatedComponent = await response.json();
-          console.log('Updated component data:', updatedComponent);
-
-          // Update the component in the table data with force refresh
-          setTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.children
-                ? {
-                  ...item,
-                  children: item.children.map((child) =>
-                    child.id === updatedFeature.component_id
-                      ? { ...child, data: updatedComponent, name: updatedComponent.name }
-                      : child
-                  ),
-                }
-                : item
-            );
-            console.log('Component progress updated in tableData:', updated);
-            return updated;
-          });
-
-          setAllTableData((prevData) => {
-            const updated = prevData.map((item) =>
-              item.type === "product" && item.children
-                ? {
-                  ...item,
-                  children: item.children.map((child) =>
-                    child.id === updatedFeature.component_id
-                      ? { ...child, data: updatedComponent, name: updatedComponent.name }
-                      : child
-                  ),
-                }
-                : item
-            );
-            console.log('Component progress updated in allTableData:', updated);
-            return updated;
-          });
-        }
-      } catch (error) {
-        console.error('Error refreshing component progress:', error);
-      }
-    };
-
-    // Call the refresh function
-    refreshComponentProgress();
+    const updateInList = (list: TableItem[]) => 
+      list.map(p => ({
+        ...p,
+        children: p.children?.map(s => ({
+          ...s,
+          children: s.children?.map(c => ({
+            ...c,
+            children: c.children?.map(f => f.id === updatedFeature.id 
+              ? { ...f, data: updatedFeature, name: updatedFeature.name } 
+              : f
+            )
+          }))
+        }))
+      }));
+    setTableData(prev => updateInList(prev));
+    setAllTableData(prev => updateInList(prev));
+    fetchProducts();
   };
 
   const handleProductDeleted = (deletedProductId: string) => {
@@ -2233,69 +1930,41 @@ export default function ProductTable({
     }
   };
 
-  // Helper function to get progress value based on version filter
   const getProgressValue = (item: TableItem): number => {
-    // If version filter is applied, show version-specific progress
+    // 1. If version filter is applied, show version-specific progress
     if (versionFilter && versionFilter.length > 0) {
-      const selectedVersion = versionFilter[0]; // Take the first version if multiple
-      if (item.data.version_progress && item.data.version_progress.length > 0) {
+      const selectedVersion = versionFilter[0];
+      if (item.data.version_progress && Array.isArray(item.data.version_progress)) {
         const versionData = item.data.version_progress.find((vp: any) => vp.version === selectedVersion);
-        return versionData ? versionData.progress : 0;
+        if (versionData) return Number(versionData.progress) || 0;
       }
     }
 
-    // For products, calculate average progress from components
-    if (item.type === 'product' && item.children && item.children.length > 0) {
-      const componentsWithProgress = item.children.filter(child =>
-        child.type === 'component' &&
-        typeof (child.data as Component).progress === 'number'
-      );
+    // 2. Get the raw manual progress value from data
+    const manualProgress = item.data.progress !== undefined && item.data.progress !== null 
+      ? Number(item.data.progress) 
+      : 0;
 
-      if (componentsWithProgress.length > 0) {
-        const totalProgress = componentsWithProgress.reduce((sum, child) =>
-          sum + ((child.data as Component).progress || 0), 0
-        );
-        const averageProgress = Math.round(totalProgress / componentsWithProgress.length);
-        console.log(`Product ${item.name} progress calculation:`, {
-          components: componentsWithProgress.length,
-          totalProgress,
-          averageProgress,
-          componentProgresses: componentsWithProgress.map(c => ({ name: c.name, progress: (c.data as Component).progress }))
-        });
-        return averageProgress;
-      }
+    // 3. If it's a leaf node (feature), always return its manual progress
+    if (item.type === 'feature') {
+      return manualProgress;
     }
 
-    // For components, calculate average progress from features
-    if (item.type === 'component' && item.children && item.children.length > 0) {
-      const featuresWithProgress = item.children.filter(child =>
-        child.type === 'feature' &&
-        typeof (child.data as Feature).progress === 'number'
-      );
-
-      if (featuresWithProgress.length > 0) {
-        const totalProgress = featuresWithProgress.reduce((sum, child) =>
-          sum + ((child.data as Feature).progress || 0), 0
-        );
-        const averageProgress = Math.round(totalProgress / featuresWithProgress.length);
-        console.log(`Component ${item.name} progress calculation from features:`, {
-          features: featuresWithProgress.length,
-          totalProgress,
-          averageProgress,
-          featureProgresses: featuresWithProgress.map(f => ({ name: f.name, progress: (f.data as Feature).progress }))
-        });
-        return averageProgress;
-      }
+    // 4. If it has children, enforce automatic rollup for parents
+    if (item.children && item.children.length > 0) {
+      // For Products and Subproducts, we almost always want the rollup to reflect children
+      // We only use manualProgress if the item has NO children or if it's a leaf node.
+      // Exception: If we explicitly want to allow manual override, we'd check a flag here.
+      
+      const totalProgress = item.children.reduce((sum, child) => {
+        return sum + getProgressValue(child);
+      }, 0);
+      
+      return Math.round(totalProgress / item.children.length);
     }
 
-    // For components without features loaded, use stored progress
-    if (item.type === 'component') {
-      console.log(`Component ${item.name} using stored progress:`, item.data.progress);
-      return item.data.progress || 0;
-    }
-
-    // Fallback to stored progress
-    return item.data.progress || 0;
+    // 5. Fallback for leaf nodes or items with no children
+    return manualProgress;
   };
 
   // Helper function to get progress color based on percentage
@@ -2339,29 +2008,27 @@ export default function ProductTable({
         <CreateComponentModal
           isOpen={isCreateComponentModalOpen}
           onClose={() => { setIsCreateComponentModalOpen(false); setEditingComponentId(null); }}
-          productId={selectedProductIdForComponent}
+          subproductId={selectedSubproductIdForComponent}
           componentId={editingComponentId}
-          onComponentCreated={(component, productId) => {
+          onComponentCreated={(component, subproductId) => {
             if (editingComponentId) {
               // Update component in table
-              setTableData((prevData) => prevData.map(item =>
-                item.id === productId && item.children ? {
-                  ...item,
-                  children: item.children.map(child =>
-                    child.id === component.id ? { ...child, data: component } : child
-                  )
-                } : item
-              ));
-              setAllTableData((prevData) => prevData.map(item =>
-                item.id === productId && item.children ? {
-                  ...item,
-                  children: item.children.map(child =>
-                    child.id === component.id ? { ...child, data: component } : child
-                  )
-                } : item
-              ));
+              setTableData((prevData) => prevData.map(p => ({
+                ...p,
+                children: p.children?.map(s => s.id === subproductId && s.children ? {
+                  ...s,
+                  children: s.children.map(c => c.id === component.id ? { ...c, data: component } : c)
+                } : s)
+              })));
+              setAllTableData((prevData) => prevData.map(p => ({
+                ...p,
+                children: p.children?.map(s => s.id === subproductId && s.children ? {
+                  ...s,
+                  children: s.children.map(c => c.id === component.id ? { ...c, data: component } : c)
+                } : s)
+              })));
             } else {
-              createNewComponent(component, productId);
+              createNewComponent(component, subproductId);
             }
             setIsCreateComponentModalOpen(false);
             setEditingComponentId(null);
@@ -2371,7 +2038,7 @@ export default function ProductTable({
         <CreateFeatureModal
           isOpen={isCreateFeatureModalOpen}
           onClose={() => { setIsCreateFeatureModalOpen(false); setEditingFeatureId(null); }}
-          componentId={selectedComponentIdForFeature}
+          componentId={selectedComponentIdForFeature as string}
           featureId={editingFeatureId}
           onFeatureCreated={(feature, componentId) => {
             if (editingFeatureId) {
@@ -2409,6 +2076,29 @@ export default function ProductTable({
             setEditingFeatureId(null);
           }}
         />
+        <SubproductSidesheet
+          isOpen={isSubproductSidesheetOpen}
+          onClose={() => {
+            setIsSubproductSidesheetOpen(false);
+            setSelectedSubproductId(null);
+            setSelectedProductIdForSubproduct(null);
+          }}
+          productId={selectedProductIdForSubproduct as string}
+          subproductId={selectedSubproductId}
+          initialData={selectedSubproductData}
+          onSubproductCreated={() => {
+            fetchProducts();
+            setIsSubproductSidesheetOpen(false);
+          }}
+          onSubproductUpdated={(data) => {
+            handleSubproductUpdated(data);
+            setIsSubproductSidesheetOpen(false);
+          }}
+          onSubproductDeleted={() => {
+            fetchProducts();
+            setIsSubproductSidesheetOpen(false);
+          }}
+        />
 
 
         {selectedProduct && (
@@ -2416,7 +2106,7 @@ export default function ProductTable({
             productId={selectedProduct.data.id}
             isOpen={isProductDetailOpen}
             onClose={handleCloseProductDetails}
-            onProductUpdated={handleProductUpdate}
+            onProductUpdated={handleProductUpdated}
             onProductDeleted={() => handleProductDeleted(selectedProduct.data.id)}
           />
         )}
@@ -2655,15 +2345,15 @@ export default function ProductTable({
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <button
-                                        onClick={() => handleCreateComponentClick(item.id)}
+                                        onClick={() => handleCreateSubproductClick(item.id)}
                                         className="p-2 rounded-full bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 transition"
-                                        aria-label="Add component"
+                                        aria-label="Add subproduct"
                                       >
                                         <img className="w-4 h-4" src="/add.svg" alt="Add" />
                                       </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" align="center">
-                                      Add component
+                                      Add subproduct
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -2673,7 +2363,7 @@ export default function ProductTable({
                               </div>
                             </div>
                           </div>
-                          {creatingComponentForProduct === item.id && (
+                          {creatingComponentForSubproduct === item.id && (
                             <div className="ml-2 flex items-center gap-2">
                               <Input
                                 type="text"

@@ -1,6 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+
+export const dynamic = 'force-dynamic';
 import { updateComponentProgressWithParents } from '@/utils/progressCalculator';
 
 // Helper function to determine status based on progress
