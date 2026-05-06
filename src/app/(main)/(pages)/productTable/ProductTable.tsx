@@ -56,6 +56,18 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
+// Helper: format date to YYYY-MM-DD
+function formatDate(date: any): string {
+  if (!date) return "-";
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return String(date).split('T')[0];
+    return dateObj.toISOString().split('T')[0];
+  } catch (e) {
+    return String(date).split('T')[0] || "-";
+  }
+}
+
 interface ProductTableProps {
   selectedProductIds: string[];
   teamFilter?: string[];
@@ -1653,11 +1665,11 @@ export default function ProductTable({
         )}
         {visibleColumns.team && <TableCell className="w-[144px] text-center border-r">{child.data.team || "-"}</TableCell>}
         {visibleColumns.days && <TableCell className="w-[112px] text-center border-r">{child.data.days ?? "-"}</TableCell>}
-        {visibleColumns.startDate && <TableCell className="w-[120px] text-center border-r">{(child.data as any).startdate || "-"}</TableCell>}
-        {visibleColumns.targetDate && <TableCell className="w-[120px] text-center border-r">{(child.data as any).targetdate || "-"}</TableCell>}
+        {visibleColumns.startDate && <TableCell className="w-[120px] text-center border-r">{formatDate((child.data as any).startdate)}</TableCell>}
+        {visibleColumns.targetDate && <TableCell className="w-[120px] text-center border-r">{formatDate((child.data as any).targetdate)}</TableCell>}
         {visibleColumns.taskType && <TableCell className="w-[120px] text-center border-r">{child.type === "feature" ? (child.data as Feature).task_type || "-" : "-"}</TableCell>}
         {visibleColumns.subTaskType && <TableCell className="w-[120px] text-center border-r">{child.type === "feature" ? (child.data as Feature).sub_task_type || "-" : "-"}</TableCell>}
-        {visibleColumns.completedon && <TableCell className="w-[170px] text-center border-r">{child.data.completedon || "-"}</TableCell>}
+        {visibleColumns.completedon && <TableCell className="w-[170px] text-center border-r">{formatDate(child.data.completedon)}</TableCell>}
         {visibleColumns.remarks && <TableCell className="w-[300px] text-center border-r truncate">{child.data.remarks || "-"}</TableCell>}
         {visibleColumns.description && <TableCell className="w-[300px] text-center">{child.data.description || "-"}</TableCell>}
       </TableRow>,
@@ -2451,22 +2463,12 @@ export default function ProductTable({
                     )}
                     {visibleColumns.startDate && (
                       <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        {(() => {
-                          const startDate = item.data.startdate;
-                          if (!startDate) return "-";
-                          if (typeof startDate === 'string') return startDate;
-                          return (startDate as Date).toISOString().split('T')[0];
-                        })()}
+                        {formatDate(item.data.startdate)}
                       </TableCell>
                     )}
                     {visibleColumns.targetDate && (
                       <TableCell className="w-[120px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        {(() => {
-                          const endDate = item.data.targetdate;
-                          if (!endDate) return "-";
-                          if (typeof endDate === 'string') return endDate;
-                          return (endDate as Date).toISOString().split('T')[0];
-                        })()}
+                        {formatDate(item.data.targetdate)}
                       </TableCell>
                     )}
                     {visibleColumns.taskType && (
@@ -2493,7 +2495,7 @@ export default function ProductTable({
                     )}
                     {visibleColumns.completedon && (
                       <TableCell className="w-[170px] text-center text-[14px] text-gray-700 border-r border-gray-200">
-                        {item.data.completedon || "-"}
+                        {formatDate(item.data.completedon)}
                       </TableCell>
                     )}
                     {visibleColumns.remarks && (

@@ -1,61 +1,4 @@
 
-// import { useState } from 'react';
-// import { supabase } from '@/lib/supabaseClient';
-// import { updateProductProgressInDb, updateComponentProgressInDb } from '@/utils/progressCalculator';
-
-// export function useProgressUpdates() {
-//   const [isUpdating, setIsUpdating] = useState(false);
-
-//   // Update a specific component's progress
-//   const updateComponentProgress = async (componentId: string, teamFilter: string[] = []) => {
-//     setIsUpdating(true);
-//     try {
-//       await updateComponentProgressInDb(componentId, teamFilter);
-      
-//       // Get the component to find its product
-//       const { data: component } = await supabase
-//         .from('pb_components')
-//         .select('product_id')
-//         .eq('id', componentId)
-//         .single();
-        
-//       if (component) {
-//         // Update the product progress too
-//         await updateProductProgressInDb(component.product_id, teamFilter);
-//       }
-      
-//       return true;
-//     } catch (error) {
-//       console.error("Error updating progress:", error);
-//       return false;
-//     } finally {
-//       setIsUpdating(false);
-//     }
-//   };
-  
-//   // Update a specific product's progress
-//   const updateProductProgress = async (productId: string, teamFilter: string[] = []) => {
-//     setIsUpdating(true);
-//     try {
-//       await updateProductProgressInDb(productId, teamFilter);
-//       return true;
-//     } catch (error) {
-//       console.error("Error updating product progress:", error);
-//       return false;
-//     } finally {
-//       setIsUpdating(false);
-//     }
-//   };
-
-//   return {
-//     isUpdating,
-//     updateComponentProgress,
-//     updateProductProgress
-//   };
-// }
-
-
-
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { updateProductProgressInDb, updateComponentProgressInDb } from '@/utils/progressCalculator';
@@ -70,19 +13,19 @@ export function useProgressUpdates() {
     try {
       // Update the component progress in the database
       await updateComponentProgressInDb(componentId, teamFilter);
-      
+
       // Get the component to find its product
       const { data: component } = await supabase
         .from('pb_components')
         .select('product_id')
         .eq('id', componentId)
         .single();
-        
+
       if (component) {
         // Update the product progress too
-        await updateProductProgressInDb(component.product_id, teamFilter);
+        await updateProductProgressInDb(component.product_id);
       }
-      
+
       return true;
     } catch (error) {
       console.error("Error updating progress:", error);
@@ -91,12 +34,12 @@ export function useProgressUpdates() {
       setIsUpdating(false);
     }
   };
-  
+
   // Update a specific product's progress
   const updateProductProgress = async (productId: string, teamFilter: string[] = []) => {
     setIsUpdating(true);
     try {
-      await updateProductProgressInDb(productId, teamFilter);
+      await updateProductProgressInDb(productId);
       return true;
     } catch (error) {
       console.error("Error updating product progress:", error);
@@ -108,7 +51,7 @@ export function useProgressUpdates() {
 
   // Refresh table data with latest progress values
   const refreshProgressData = async (
-    tableData: TableItem[], 
+    tableData: TableItem[],
     setTableData: (data: TableItem[]) => void,
     teamFilter: string[] = []
   ) => {

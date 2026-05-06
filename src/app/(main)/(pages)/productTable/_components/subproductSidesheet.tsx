@@ -27,9 +27,8 @@ function SubproductTab({ label, isActive, onClick }: { label: string; isActive: 
   return (
     <button
       onClick={onClick}
-      className={`inline-block py-2 px-4 font-medium text-sm ${
-        isActive ? 'border-b-2 border-blue-500 text-blue-500' : 'text-gray-500 hover:text-gray-700'
-      }`}
+      className={`inline-block py-2 px-4 font-medium text-sm ${isActive ? 'border-b-2 border-blue-500 text-blue-500' : 'text-gray-500 hover:text-gray-700'
+        }`}
     >
       {label}
     </button>
@@ -226,8 +225,8 @@ function DetailsTabContent({
             />
           )
         ) : (
-          <span 
-            className="block text-gray-800 min-h-[28px] text-sm cursor-pointer hover:bg-gray-50 rounded px-1 -ml-1 py-1 transition-colors" 
+          <span
+            className="block text-gray-800 min-h-[28px] text-sm cursor-pointer hover:bg-gray-50 rounded px-1 -ml-1 py-1 transition-colors"
             onClick={() => setEditingField(field)}
           >
             {(draftSubproduct[field] as any) || 'Not assigned'}
@@ -323,7 +322,7 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
         const data = await response.json();
         setProductName(data.name);
       }
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const fetchSubproduct = async () => {
@@ -331,16 +330,16 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
     if (!initialData) {
       setFetching(true);
     }
-    
+
     try {
       const response = await fetch(`/api/subproduct/${subproductId}`);
       if (!response.ok) throw new Error('Failed to fetch subproduct');
       const data = await response.json();
-      
+
       // Update both original and draft
       setSubproduct(data);
       setDraftSubproduct(data);
-      
+
       if (data.product_id) fetchProductName(data.product_id);
     } catch (error) {
       if (!initialData) {
@@ -372,7 +371,7 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
   const handleInputBlur = (field: keyof Subproduct) => {
     setTimeout(() => {
       const activeElement = document.activeElement;
-      const isSwitchingToEditableField = activeElement && 
+      const isSwitchingToEditableField = activeElement &&
         (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT');
       if (!isSwitchingToEditableField) {
         setEditingField(null);
@@ -458,7 +457,7 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
                       className="w-full text-2xl font-bold border-2 border-blue-200 focus:border-blue-500 bg-blue-50 px-4 py-2 rounded h-12"
                     />
                   ) : (
-                    <SheetTitle 
+                    <SheetTitle
                       className="text-2xl font-bold text-blue-900 w-full cursor-pointer hover:text-blue-700 transition-colors"
                       onClick={() => setEditingField('name')}
                     >
@@ -527,11 +526,11 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
           {/* Footer */}
           <div className="flex-shrink-0 p-4 border-t bg-gray-50/50 flex justify-between items-center px-8">
             {subproductId && (
-              <Button 
-                type="button" 
-                variant="destructive" 
-                className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2" 
-                onClick={() => setShowDeleteDialog(true)} 
+              <Button
+                type="button"
+                variant="destructive"
+                className="px-6 py-2 text-white rounded-lg bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2"
+                onClick={() => setShowDeleteDialog(true)}
                 disabled={loading}
               >
                 <Trash2 className="h-4 w-4" />
@@ -539,22 +538,22 @@ export const SubproductSidesheet: React.FC<SubproductSidesheetProps> = ({
               </Button>
             )}
             <div className="flex gap-3 ml-auto">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose} 
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
                 disabled={loading}
                 className="px-6 py-2 rounded-lg border-gray-300 hover:bg-white transition-all"
               >
                 Cancel
               </Button>
-              <Button 
-                onClick={handleSubmit} 
-                disabled={loading} 
+              <Button
+                onClick={handleSubmit}
+                disabled={loading}
                 className="px-8 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-md shadow-blue-200"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {subproductId ? 'Save Changes' : 'Create Subproduct'}
+                {subproductId ? 'Save' : 'Create Subproduct'}
               </Button>
             </div>
           </div>

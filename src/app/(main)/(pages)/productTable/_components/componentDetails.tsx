@@ -426,7 +426,8 @@ export function ComponentDetailsPage({ componentId, isOpen, onClose, onComponent
     setDraftComponent(prev => {
       if (!prev) return null;
       
-      const updatedDraft = { ...prev, [field]: value };
+      const updatedValue = field === 'progress' ? (parseInt(value) || 0) : value;
+      const updatedDraft = { ...prev, [field]: updatedValue };
       
       // Automatically update status based on progress
       if (field === 'progress') {
