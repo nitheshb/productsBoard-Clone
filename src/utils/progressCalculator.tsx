@@ -75,11 +75,19 @@ export const updateComponentProgressInDb = async (componentId: string, teamFilte
     if (featuresError) throw featuresError;
 
     if (!features || features.length === 0) {
-      await supabase
+      // If no features, we shouldn't reset the component's progress. 
+      // It might have a manual progress set by the user.
+      // Just fetch current progress to return it for parent updates.
+      const { data: comp } = await supabase
         .from('pb_components')
-        .update({ progress: 0, status: 'Todo' })
-        .eq('id', componentId);
-      return 0;
+        .select('progress, subproduct_id')
+        .eq('id', componentId)
+        .single();
+        
+      if (comp?.subproduct_id) {
+        await updateSubproductProgressInDb(comp.subproduct_id);
+      }
+      return comp?.progress || 0;
     }
 
     // Calculate average progress from actual progress values
@@ -133,11 +141,17 @@ export const updateSubproductProgressInDb = async (subproductId: string) => {
     if (error) throw error;
 
     if (!components || components.length === 0) {
-      await supabase
+      // If no components, preserve manual progress and just trigger parent update
+      const { data: subp } = await supabase
         .from('pb_subproducts')
-        .update({ progress: 0, status: 'Todo' })
-        .eq('id', subproductId);
-      return 0;
+        .select('progress, product_id')
+        .eq('id', subproductId)
+        .single();
+        
+      if (subp?.product_id) {
+        await updateProductProgressInDb(subp.product_id);
+      }
+      return subp?.progress || 0;
     }
 
     const total = components.reduce((sum, c) => sum + (c.progress || 0), 0);
@@ -178,11 +192,14 @@ export const updateProductProgressInDb = async (productId: string) => {
     if (error) throw error;
 
     if (!subproducts || subproducts.length === 0) {
-      await supabase
+      // If no subproducts, preserve manual progress
+      const { data: prod } = await supabase
         .from('pb_products')
-        .update({ progress: 0, status: 'Todo' })
-        .eq('id', productId);
-      return 0;
+        .select('progress')
+        .eq('id', productId)
+        .single();
+        
+      return prod?.progress || 0;
     }
 
     const total = subproducts.reduce((sum, s) => sum + (s.progress || 0), 0);

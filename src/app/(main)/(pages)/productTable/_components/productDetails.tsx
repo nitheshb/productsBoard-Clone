@@ -46,7 +46,6 @@ function DetailsTabContent({
   handleInputChange,
   handleInputBlur,
   handleInputKeyPress,
-  handleComponentsInputChange,
   onSave, // <-- new prop
   saving, // <-- new prop
 }: {
@@ -59,7 +58,6 @@ function DetailsTabContent({
   handleInputChange: (field: keyof Product, value: any) => void;
   handleInputBlur: (field: keyof Product) => Promise<void>;
   handleInputKeyPress: (event: React.KeyboardEvent<HTMLInputElement>, field: keyof Product) => Promise<void>;
-  handleComponentsInputChange: (value: string) => void;
   onSave: () => Promise<void>;
   saving: boolean;
 }) {
@@ -384,7 +382,8 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
           updatedDraft.team_id = value.id || null;
         }
       } else {
-        updatedDraft = { ...prev, [field]: value };
+        const updatedValue = field === 'progress' ? (parseInt(value) || 0) : value;
+        updatedDraft = { ...prev, [field]: updatedValue };
       }
       
       // Automatically update status based on progress
@@ -514,9 +513,7 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
     }
   };
 
-  const handleComponentsInputChange = (value: string) => {
-    handleInputChange('components', value);
-  };
+
 
   const handleTabChange = (tab: 'details' | 'insights' | 'portal') => {
     setActiveTab(tab);
@@ -595,7 +592,6 @@ export function ProductDetailsPage({ productId, isOpen, onClose, onProductUpdate
                   handleInputChange={handleInputChange}
                   handleInputBlur={handleInputBlur}
                   handleInputKeyPress={handleInputKeyPress}
-                  handleComponentsInputChange={handleComponentsInputChange}
                   onSave={() => saveChanges(false)}
                   saving={saving}
                 />
