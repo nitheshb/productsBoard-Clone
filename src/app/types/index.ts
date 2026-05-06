@@ -23,12 +23,32 @@ export interface Product {
   remarks?: string;
   description?: string;
   created_at: string;
+  subproducts?: Subproduct[];
+}
+
+export interface Subproduct {
+  id: string;
+  product_id: string;
+  name: string;
+  status?: string;
+  progress?: number;
+  version?: string;
+  version_progress?: VersionProgress[];
+  team?: string;
+  team_id?: string | null;
+  days?: number;
+  startdate?: string;
+  targetdate?: string;
+  completedon?: string;
+  remarks?: string;
+  description?: string;
+  created_at: string;
   components?: Component[];
 }
 
 export interface Component {
   id: string;
-  product_id: string;
+  subproduct_id: string;
   name: string;
   status?: string;
   progress?: number;
@@ -96,11 +116,11 @@ export interface TaskType {
 
 
 export interface TableItem {
-  type: 'product' | 'component' | 'feature';
+  type: 'product' | 'subproduct' | 'component' | 'feature';
   id: string;
   name: string;
   level: number;
-  data: Product | Component | Feature;
+  data: Product | Subproduct | Component | Feature;
   children?: TableItem[];
 }
 
