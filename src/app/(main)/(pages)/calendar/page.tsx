@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import React from 'react';
 import FeatureDetailsPage from '@/app/(main)/(pages)/productTable/_components/featureDetails';
+import ProductDropdown from '@/app/(main)/(pages)/productDropdown/ProductDropdown';
 import { CalendarSkeleton } from '@/components/ui/CalendarSkeleton';
 
 interface TeamMember {
@@ -113,10 +114,14 @@ export default function CalendarPage() {
             pb_components!inner (
               id,
               name,
-              product_id,
-              pb_products!inner (
+              pb_subproducts!inner (
                 id,
-                name
+                name,
+                product_id,
+                pb_products!inner (
+                  id,
+                  name
+                )
               )
             )
           `)
@@ -124,8 +129,16 @@ export default function CalendarPage() {
 
         if (fetchError) throw fetchError;
 
-        // Extract unique teams from the task data
-        const uniqueTeams = [...new Set(taskData.map(item => item.team).filter(Boolean))];
+        // Apply product filter if specific product is selected
+        let filteredTasks = taskData || [];
+        if (selectedProductId !== 'all') {
+          filteredTasks = (taskData || []).filter((task: any) => 
+            task.pb_components?.pb_subproducts?.product_id === selectedProductId
+          );
+        }
+
+        // Extract unique teams from the filtered data
+        const uniqueTeams = [...new Set(filteredTasks.map(item => item.team).filter(Boolean))];
 
         // Create team members from actual team names in database
         const teamMembers: TeamMember[] = uniqueTeams.map((team: string, index: number) => {
@@ -146,13 +159,11 @@ export default function CalendarPage() {
         // Use the task data directly
         const allTaskData = taskData;
 
-        if (fetchError) throw fetchError;
-
         // Apply product filter in JavaScript if a specific product is selected
         let filteredTaskData = allTaskData;
         if (selectedProductId !== 'all') {
           filteredTaskData = allTaskData?.filter(task =>
-            (task.pb_components as any)?.product_id === selectedProductId
+            (task.pb_components as any)?.pb_subproducts?.product_id === selectedProductId
           ) || [];
         }
 
@@ -160,20 +171,31 @@ export default function CalendarPage() {
         const formattedTasks: Task[] = filteredTaskData && filteredTaskData.length > 0
           ? filteredTaskData
               .filter(task => task.startdate && task.targetdate) // Only include tasks with both dates
-              .map(task => ({
-                id: task.id,
-                name: task.name,
-                description: task.description || '',
-                estimatedTime: '4h', // Default estimated time
-                status: task.status || 'Todo',
-                startDate: task.startdate,
-                targetDate: task.targetdate,
-                color: 'blue', // Default color since it's not in database
-                team: task.team,
-                created_at: task.created_at || '2024-01-01T00:00:00.000Z',
-                pb_components: task.pb_components
-              } as unknown as Task))
+              .map(task => {
+                const component = task.pb_components as any;
+                const subproduct = component?.pb_subproducts;
+                const product = subproduct?.pb_products;
+
+                return {
+                  id: task.id,
+                  name: task.name,
+                  description: task.description || '',
+                  estimatedTime: '4h', // Default estimated time
+                  status: task.status || 'Todo',
+                  startDate: task.startdate,
+                  targetDate: task.targetdate,
+                  color: 'blue', // Default color since it's not in database
+                  team: task.team,
+                  created_at: task.created_at || '2024-01-01T00:00:00.000Z',
+                  pb_components: {
+                    ...component,
+                    pb_products: product // Map product for use in UI
+                  }
+                } as unknown as Task;
+              })
           : [];
+ 
+
 
         // Sort tasks alphabetically by name
         const sortedTasks = formattedTasks.sort((a, b) => a.name.localeCompare(b.name));
@@ -190,6 +212,14 @@ export default function CalendarPage() {
 
     fetchData();
   }, [selectedProductId]);
+ 
+  const handleProductSelect = (productIds: string[]) => {
+    if (productIds.length > 1 || productIds.length === 0) {
+      setSelectedProductId('all');
+    } else {
+      setSelectedProductId(productIds[0]);
+    }
+  };
 
   if (!isMounted || isLoading) {
     return <CalendarSkeleton />;
@@ -203,8 +233,10 @@ export default function CalendarPage() {
           <div className="max-w-8xl mx-auto">
             <header className="flex justify-between items-center p-4 bg-white border-b">
               <div className="flex items-center gap-2">
-                <CalendarIcon className="h-6 w-6 text-blue-500" />
-                <h1 className="text-xl font-semibold">Dev Calendar</h1>
+                <div className="p-1 bg-white text-gray-400 rounded-md">
+                   <CalendarIcon className="h-6 w-6 text-blue-500" />
+                </div>
+                <ProductDropdown onProductSelect={handleProductSelect} />
               </div>
             </header>
             <div className="flex items-center justify-center h-96">
@@ -377,8 +409,10 @@ export default function CalendarPage() {
           {/* Header */}
             <header className="flex justify-between items-center p-4 bg-white border-b flex-shrink-0">
             <div className="flex items-center gap-2">
-              <CalendarIcon className="h-6 w-6 text-blue-500" />
-              <h1 className="text-xl font-semibold">Dev Calendar</h1>
+              <div className="p-1 bg-white text-gray-400 rounded-md">
+                 <CalendarIcon className="h-6 w-6 text-blue-500" />
+              </div>
+              <ProductDropdown onProductSelect={handleProductSelect} />
             </div>
             
             {/* Search Bar */}
