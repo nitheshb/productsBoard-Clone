@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, MagnifyingGlassIcon, ChevronDownIcon, CheckCircleIcon, PlusIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import React from 'react';
 import { GoalsSkeleton } from '@/components/ui/GoalsSkeleton';
+import ProductDropdown from '@/app/(main)/(pages)/productDropdown/ProductDropdown';
+import { Product } from '@/app/types';
 
 interface Goal {
   id: string;
@@ -15,6 +17,7 @@ interface Goal {
   targetDate: string;
   status: string;
   color: string;
+  productName?: string;
   created_at: string;
 }
 
@@ -28,12 +31,12 @@ interface GoalsBoardProps {
   setGranularity: (granularity: 'quarterly' | 'months' | 'weeks') => void;
 }
 
-const GoalsBoard = ({ 
-  currentDate, 
-  setCurrentDate, 
-  goals, 
-  searchQuery, 
-  setSearchQuery, 
+const GoalsBoard = ({
+  currentDate,
+  setCurrentDate,
+  goals,
+  searchQuery,
+  setSearchQuery,
   granularity,
   setGranularity
 }: GoalsBoardProps) => {
@@ -62,46 +65,46 @@ const GoalsBoard = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
-  
+
   // Get timeline data based on granularity
   const getTimelineData = (date: Date, granularity: 'quarterly' | 'months' | 'weeks') => {
     const timeline = [];
-    
+
     if (granularity === 'quarterly') {
       const year = date.getFullYear();
       const currentMonth = date.getMonth();
       const currentQuarter = Math.floor(currentMonth / 3);
-      
+
       // Previous quarter
       const prevQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
       const prevYear = currentQuarter === 0 ? year - 1 : year;
       const prevQuarterStart = new Date(prevYear, prevQuarter * 3, 1);
       const prevQuarterEnd = new Date(prevYear, (prevQuarter + 1) * 3, 0);
-      
+
       // Current quarter
       const currentQuarterStart = new Date(year, currentQuarter * 3, 1);
       const currentQuarterEnd = new Date(year, (currentQuarter + 1) * 3, 0);
-      
+
       // Next quarter
       const nextQuarter = currentQuarter === 3 ? 0 : currentQuarter + 1;
       const nextYear = currentQuarter === 3 ? year + 1 : year;
       const nextQuarterStart = new Date(nextYear, nextQuarter * 3, 1);
       const nextQuarterEnd = new Date(nextYear, (nextQuarter + 1) * 3, 0);
-      
+
       timeline.push({
         start: prevQuarterStart,
         end: prevQuarterEnd,
         label: `Q${prevQuarter + 1} ${prevYear}`,
         type: 'previous'
       });
-      
+
       timeline.push({
         start: currentQuarterStart,
         end: currentQuarterEnd,
         label: `Q${currentQuarter + 1} ${year}`,
         type: 'current'
       });
-      
+
       timeline.push({
         start: nextQuarterStart,
         end: nextQuarterEnd,
@@ -111,22 +114,22 @@ const GoalsBoard = ({
     } else if (granularity === 'months') {
       const year = date.getFullYear();
       const currentMonth = date.getMonth();
-      
+
       // Show 4 months: last month, this month, next month, next+1 month
       for (let i = -1; i <= 2; i++) {
         const monthIndex = currentMonth + i;
         const monthYear = monthIndex < 0 ? year - 1 : monthIndex > 11 ? year + 1 : year;
         const adjustedMonth = monthIndex < 0 ? 12 + monthIndex : monthIndex > 11 ? monthIndex - 12 : monthIndex;
-        
+
         const monthStart = new Date(monthYear, adjustedMonth, 1);
         const monthEnd = new Date(monthYear, adjustedMonth + 1, 0);
-        
+
         let type = 'current';
         if (i === -1) type = 'last';
         else if (i === 0) type = 'current';
         else if (i === 1) type = 'next';
         else if (i === 2) type = 'next2';
-        
+
         timeline.push({
           start: monthStart,
           end: monthEnd,
@@ -138,30 +141,30 @@ const GoalsBoard = ({
       // Weeks view - show 3 months worth of weeks
       const year = date.getFullYear();
       const currentMonth = date.getMonth();
-      
+
       // Calculate weeks for 3 months: previous, current, next
       for (let monthOffset = -1; monthOffset <= 1; monthOffset++) {
         const monthIndex = currentMonth + monthOffset;
         const monthYear = monthIndex < 0 ? year - 1 : monthIndex > 11 ? year + 1 : year;
         const adjustedMonth = monthIndex < 0 ? 12 + monthIndex : monthIndex > 11 ? monthIndex - 12 : monthIndex;
-        
+
         const monthStart = new Date(monthYear, adjustedMonth, 1);
         const monthEnd = new Date(monthYear, adjustedMonth + 1, 0);
-        
+
         // Get all weeks in this month
         const current = new Date(monthStart);
         while (current <= monthEnd) {
           const weekStart = new Date(current);
           const weekEnd = new Date(current);
           weekEnd.setDate(weekEnd.getDate() + 6);
-          
+
           // Only include weeks that are within the month
           if (weekStart.getMonth() === adjustedMonth) {
             let type = 'current';
             if (monthOffset === -1) type = 'previous';
             else if (monthOffset === 0) type = 'current';
             else if (monthOffset === 1) type = 'next';
-            
+
             timeline.push({
               start: weekStart,
               end: weekEnd,
@@ -171,12 +174,12 @@ const GoalsBoard = ({
               monthYear: monthYear
             });
           }
-          
+
           current.setDate(current.getDate() + 7);
         }
       }
     }
-    
+
     return timeline;
   };
 
@@ -185,7 +188,7 @@ const GoalsBoard = ({
   // Group weeks by month for weeks view
   const getWeeksByMonth = () => {
     if (granularity !== 'weeks') return {};
-    
+
     const monthGroups: { [key: string]: any[] } = {};
     timelineData.forEach(period => {
       const monthKey = `${period.month} ${period.monthYear}`;
@@ -194,7 +197,7 @@ const GoalsBoard = ({
       }
       monthGroups[monthKey].push(period);
     });
-    
+
     return monthGroups;
   };
 
@@ -202,44 +205,14 @@ const GoalsBoard = ({
 
   // Organize goals by status
   const goalsByStatus = {
-    'In Progress': goals.filter(goal => goal.status === 'In Progress'),
     'Todo': goals.filter(goal => goal.status === 'Todo'),
-    'Completed': goals.filter(goal => goal.status === 'Completed')
+    'In Progress': goals.filter(goal => goal.status === 'In Progress'),
+    'Completed': goals.filter(goal => goal.status === 'Completed'),
+    // 'Blocked': goals.filter(goal => goal.status === 'Blocked'),
+    // 'Review': goals.filter(goal => goal.status === 'Review'),
+    // 'Testing': goals.filter(goal => goal.status === 'Testing'),
   };
 
-  // Calculate task position and width
-  const getTaskPosition = (goal: Goal) => {
-    const startDate = new Date(goal.startDate);
-    const endDate = new Date(goal.targetDate);
-    
-    // For all granularities, only show tasks in the current period
-    const currentPeriod = timelineData.find(p => p.type === 'current');
-    if (!currentPeriod) return { left: '0%', width: '0%' };
-    
-    // Check if task overlaps with current period
-    const taskStart = Math.max(startDate.getTime(), currentPeriod.start.getTime());
-    const taskEnd = Math.min(endDate.getTime(), currentPeriod.end.getTime());
-    
-    if (taskStart > taskEnd) {
-      return { left: '0%', width: '0%' }; // Task doesn't overlap with current period
-    }
-    
-    const periodStart = currentPeriod.start.getTime();
-    const periodEnd = currentPeriod.end.getTime();
-    const periodDuration = periodEnd - periodStart;
-    
-    // Calculate position based on task start relative to period start
-    const leftPercent = ((taskStart - periodStart) / periodDuration) * 100;
-    
-    // Calculate width based on task's actual duration, not clipped duration
-    const fullTaskDuration = endDate.getTime() - startDate.getTime();
-    const widthPercent = (fullTaskDuration / periodDuration) * 100;
-    
-    return {
-      left: `${Math.max(0, leftPercent)}%`,
-      width: `${Math.min(100, widthPercent)}%`
-    };
-  };
 
   const getGoalColor = (status: string) => {
     const statusColorMap: { [key: string]: string } = {
@@ -288,7 +261,7 @@ const GoalsBoard = ({
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
-    
+
     switch (granularity) {
       case 'quarterly':
         newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 3 : -3));
@@ -300,7 +273,7 @@ const GoalsBoard = ({
         newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
         break;
     }
-    
+
     setCurrentDate(newDate);
   };
 
@@ -322,7 +295,7 @@ const GoalsBoard = ({
               <CheckCircleIcon className="h-6 w-6 text-blue-500" />
               <h1 className="text-xl font-semibold">Goals Roadmap</h1>
             </div>
-            
+
             {/* Search Bar */}
             <div className="flex-1 max-w-md mx-8">
               <div className="relative">
@@ -336,76 +309,73 @@ const GoalsBoard = ({
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {/* Board Controls Button */}
               <div className="relative board-controls-dropdown">
-                <button 
+                <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   Board Controls
                   <ChevronDownIcon className={`h-4 w-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-                
-                 {/* Dropdown Menu */}
-                 {isDropdownOpen && (
-                   <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
-                     <div className="p-2">
-                       <div className="text-sm font-medium text-gray-900 mb-2">Granularity</div>
-                       <div className="space-y-1">
-                         <button
-                           onClick={() => {
-                             setGranularity('quarterly');
-                             setIsDropdownOpen(false);
-                           }}
-                           className={`w-full text-left px-3 py-2 text-sm rounded-md ${
-                             granularity === 'quarterly' 
-                               ? 'bg-blue-100 text-blue-700' 
-                               : 'text-gray-700 hover:bg-gray-100'
-                           }`}
-                         >
-                           Quarterly
-                         </button>
-                         <button
-                           onClick={() => {
-                             setGranularity('months');
-                             setIsDropdownOpen(false);
-                           }}
-                           className={`w-full text-left px-3 py-2 text-sm rounded-md ${
-                             granularity === 'months' 
-                               ? 'bg-blue-100 text-blue-700' 
-                               : 'text-gray-700 hover:bg-gray-100'
-                           }`}
-                         >
-                           Months
-                         </button>
-                         <button
-                           onClick={() => {
-                             setGranularity('weeks');
-                             setIsDropdownOpen(false);
-                           }}
-                           className={`w-full text-left px-3 py-2 text-sm rounded-md ${
-                             granularity === 'weeks' 
-                               ? 'bg-blue-100 text-blue-700' 
-                               : 'text-gray-700 hover:bg-gray-100'
-                           }`}
-                         >
-                           Weeks
-                         </button>
-                       </div>
-                     </div>
-                   </div>
-                 )}
+
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                    <div className="p-2">
+                      <div className="text-sm font-medium text-gray-900 mb-2">Granularity</div>
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => {
+                            setGranularity('quarterly');
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md ${granularity === 'quarterly'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                          Quarterly
+                        </button>
+                        <button
+                          onClick={() => {
+                            setGranularity('months');
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md ${granularity === 'months'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                          Months
+                        </button>
+                        <button
+                          onClick={() => {
+                            setGranularity('weeks');
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md ${granularity === 'weeks'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                        >
+                          Weeks
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              <button 
+
+              <button
                 className="p-2 hover:bg-gray-100 rounded-lg"
                 onClick={() => navigateDate('prev')}
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
-              <button 
+              <button
                 className="p-2 hover:bg-gray-100 rounded-lg"
                 onClick={() => navigateDate('next')}
               >
@@ -413,8 +383,8 @@ const GoalsBoard = ({
               </button>
               <span className="text-sm text-gray-600">
                 {granularity === 'quarterly' ? `Q${Math.floor(currentDate.getMonth() / 3) + 1} ${currentDate.getFullYear()}` :
-                 granularity === 'months' ? currentDate.toLocaleDateString('en', { month: 'long', year: 'numeric' }) :
-                 currentDate.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  granularity === 'months' ? currentDate.toLocaleDateString('en', { month: 'long', year: 'numeric' }) :
+                    currentDate.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             </div>
           </header>
@@ -432,10 +402,10 @@ const GoalsBoard = ({
                         {Object.entries(weeksByMonth).map(([monthKey, weeks]) => {
                           const totalWeeks = timelineData.length;
                           const monthWidth = (weeks.length / totalWeeks) * 100;
-                          
+
                           return (
-                            <div 
-                              key={monthKey} 
+                            <div
+                              key={monthKey}
                               className="border-r border-gray-200"
                               style={{ width: `${monthWidth}%` }}
                             >
@@ -462,11 +432,11 @@ const GoalsBoard = ({
                       {/* Timeline Headers */}
                       <div className={`flex-1 ${granularity === 'quarterly' ? 'grid grid-cols-[80px_1fr_80px]' : granularity === 'months' ? 'grid grid-cols-4' : 'flex'}`}>
                         {timelineData.map((period, index) => (
-                           <div key={index} className="border-r border-gray-200">
-                             <div className="p-2 bg-gray-50 text-center">
-                               <div className="font-semibold text-sm text-gray-700">{period.label}</div>
-                             </div>
-                           </div>
+                          <div key={index} className="border-r border-gray-200">
+                            <div className="p-2 bg-gray-50 text-center">
+                              <div className="font-semibold text-sm text-gray-700">{period.label}</div>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -481,7 +451,7 @@ const GoalsBoard = ({
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-700">{status}</span>
                         <span className="text-xs text-gray-500">({statusGoals.length})</span>
-                        <div 
+                        <div
                           onClick={() => toggleSection(status)}
                           className="cursor-pointer p-1 hover:bg-gray-100 rounded transition-colors"
                         >
@@ -493,7 +463,7 @@ const GoalsBoard = ({
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Timeline Rows */}
                     {expandedSections[status] && (
                       <div className="space-y-2">
@@ -501,145 +471,147 @@ const GoalsBoard = ({
                           <div key={goal.id} className="flex">
                             {/* Timeline Row */}
                             <div className="flex-1 relative">
-                             {granularity === 'quarterly' ? (
-                               <div className="grid grid-cols-[80px_1fr_80px] h-20">
-                                 {/* Previous Period Column - Empty */}
-                                 <div className="relative">
-                                   {/* No tasks shown in previous period */}
-                                 </div>
-                                 
-                                 {/* Current Period Column */}
-                                 <div className="relative">
-                                   {/* Single task for current period */}
-                                   {(() => {
-                                     const startDate = new Date(goal.startDate);
-                                     const endDate = new Date(goal.targetDate);
-                                     const currentPeriod = timelineData.find(p => p.type === 'current');
-                                     
-                                     if (!currentPeriod) return null;
-                                     
-                                     // Check if task overlaps with current period
-                                     const taskStart = Math.max(startDate.getTime(), currentPeriod.start.getTime());
-                                     const taskEnd = Math.min(endDate.getTime(), currentPeriod.end.getTime());
-                                     
-                                     if (taskStart > taskEnd) return null;
-                                     
-                                     const periodStart = currentPeriod.start.getTime();
-                                     const periodEnd = currentPeriod.end.getTime();
-                                     const periodDuration = periodEnd - periodStart;
-                                     
-                                     // Calculate position based on task start relative to period start
-                                     const leftPercent = ((taskStart - periodStart) / periodDuration) * 100;
-                                     
-                                     // Calculate width - show full task duration within current period
-                                     let widthPercent;
-                                     if (startDate.getTime() < currentPeriod.start.getTime()) {
-                                       // Task started in previous period, start from beginning of current period
-                                       const adjustedLeft = 0;
-                                       const taskDuration = taskEnd - currentPeriod.start.getTime();
-                                       widthPercent = (taskDuration / periodDuration) * 100;
-                                     } else if (endDate.getTime() > currentPeriod.end.getTime()) {
-                                       // Task extends to next period, show full width to edge
-                                       widthPercent = 100 - leftPercent;
-                                     } else {
-                                       // Task is fully within current period
-                                       const taskDuration = taskEnd - taskStart;
-                                       widthPercent = (taskDuration / periodDuration) * 100;
-                                     }
-                                     
-                                     return (
-                                       <div
-                                         className={`absolute top-2 h-16 rounded-md border-l-4 ${getGoalColor(goal.status)} ${getBorderColor(goal.status)} cursor-pointer hover:shadow-md transition-shadow`}
-                                         style={{
-                                           left: `${Math.max(0, leftPercent)}%`,
-                                           width: `${Math.min(100, widthPercent)}%`,
-                                           minWidth: '120px'
-                                         }}
-                                         title={`${goal.componentName} - ${formatDateRange(goal.startDate, goal.targetDate)}`}
-                                       >
-                                         <div className="p-2 h-full flex flex-col justify-between">
-                                           <div className="font-medium text-xs leading-tight truncate">{goal.componentName}</div>
-                                           <div className="text-xs opacity-75 leading-tight">
-                                             {formatDateRange(goal.startDate, goal.targetDate)}
-                                           </div>
-                                           <div className="flex items-center gap-2 mt-1">
-                                             <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                               <div 
-                                                 className="h-1.5 rounded-full transition-all duration-300 bg-blue-500"
-                                                 style={{ width: `${goal.progress}%` }}
-                                               ></div>
-                                             </div>
-                                             <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{goal.progress}%</span>
-                                           </div>
-                                         </div>
-                                       </div>
-                                     );
-                                   })()}
-                                 </div>
-                                 
-                                 {/* Next Period Column - Empty */}
-                                 <div className="relative">
-                                   {/* No tasks shown in next period */}
-                                 </div>
-                               </div>
-                            ) : (
-                              <div className={`${granularity === 'months' ? 'grid grid-cols-4' : 'flex w-full'} h-20 relative`}>
-                                {/* Single task as continuous bar across the full timeline */}
-                                {(() => {
-                                  const startDate = new Date(goal.startDate);
-                                  const endDate = new Date(goal.targetDate);
-                                  
-                                  // Calculate position relative to the entire timeline
-                                  const timelineStart = timelineData[0]?.start || new Date();
-                                  const timelineEnd = timelineData[timelineData.length - 1]?.end || new Date();
-                                  const totalTimelineDuration = timelineEnd.getTime() - timelineStart.getTime();
-                                  
-                                  // Only show tasks that overlap with the visible timeline
-                                  if (endDate.getTime() < timelineStart.getTime() || startDate.getTime() > timelineEnd.getTime()) {
-                                    return null;
-                                  }
-                                  
-                                  // Calculate task position and width relative to entire timeline
-                                  // Clamp task start and end to timeline boundaries
-                                  const clampedTaskStart = Math.max(startDate.getTime(), timelineStart.getTime());
-                                  const clampedTaskEnd = Math.min(endDate.getTime(), timelineEnd.getTime());
-                                  
-                                  const taskStartPercent = ((clampedTaskStart - timelineStart.getTime()) / totalTimelineDuration) * 100;
-                                  const taskEndPercent = ((clampedTaskEnd - timelineStart.getTime()) / totalTimelineDuration) * 100;
-                                  const taskWidthPercent = taskEndPercent - taskStartPercent;
-                                  
-                                  return (
-                                    <div
-                                      className={`absolute top-2 h-16 rounded-md border-l-4 ${getGoalColor(goal.status)} ${getBorderColor(goal.status)} cursor-pointer hover:shadow-md transition-shadow`}
-                                      style={{
-                                        left: `${Math.max(0, taskStartPercent)}%`,
-                                        width: `${Math.min(100, taskWidthPercent)}%`,
-                                        minWidth: '120px'
-                                      }}
-                                      title={`${goal.componentName} - ${formatDateRange(goal.startDate, goal.targetDate)}`}
-                                    >
-                                       <div className="p-2 h-full flex flex-col justify-between">
-                                         <div className="font-medium text-xs leading-tight truncate">{goal.componentName}</div>
-                                         <div className="text-xs opacity-75 leading-tight">
-                                           {formatDateRange(goal.startDate, goal.targetDate)}
-                                         </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                            <div 
-                                              className="h-1.5 rounded-full transition-all duration-300 bg-blue-500"
-                                              style={{ width: `${goal.progress}%` }}
-                                            ></div>
+                              {granularity === 'quarterly' ? (
+                                <div className="grid grid-cols-[80px_1fr_80px] h-20">
+                                  {/* Previous Period Column - Empty */}
+                                  <div className="relative">
+                                    {/* No tasks shown in previous period */}
+                                  </div>
+
+                                  {/* Current Period Column */}
+                                  <div className="relative">
+                                    {/* Single task for current period */}
+                                    {(() => {
+                                      const startDate = new Date(goal.startDate);
+                                      const endDate = new Date(goal.targetDate);
+                                      const currentPeriod = timelineData.find(p => p.type === 'current');
+
+                                      if (!currentPeriod) return null;
+
+                                      // Check if task overlaps with current period
+                                      const taskStart = Math.max(startDate.getTime(), currentPeriod.start.getTime());
+                                      const taskEnd = Math.min(endDate.getTime(), currentPeriod.end.getTime());
+
+                                      if (taskStart > taskEnd) return null;
+
+                                      const periodStart = currentPeriod.start.getTime();
+                                      const periodEnd = currentPeriod.end.getTime();
+                                      const periodDuration = periodEnd - periodStart;
+
+                                      // Calculate position based on task start relative to period start
+                                      const leftPercent = ((taskStart - periodStart) / periodDuration) * 100;
+
+                                      // Calculate width - show full task duration within current period
+                                      let widthPercent;
+                                      if (startDate.getTime() < currentPeriod.start.getTime()) {
+                                        // Task started in previous period, start from beginning of current period
+                                        const adjustedLeft = 0;
+                                        const taskDuration = taskEnd - currentPeriod.start.getTime();
+                                        widthPercent = (taskDuration / periodDuration) * 100;
+                                      } else if (endDate.getTime() > currentPeriod.end.getTime()) {
+                                        // Task extends to next period, show full width to edge
+                                        widthPercent = 100 - leftPercent;
+                                      } else {
+                                        // Task is fully within current period
+                                        const taskDuration = taskEnd - taskStart;
+                                        widthPercent = (taskDuration / periodDuration) * 100;
+                                      }
+
+                                      return (
+                                        <div
+                                          className={`absolute top-2 h-16 rounded-md border-l-4 ${getGoalColor(goal.status)} ${getBorderColor(goal.status)} cursor-pointer hover:shadow-md transition-shadow`}
+                                          style={{
+                                            left: `${Math.max(0, leftPercent)}%`,
+                                            width: `${Math.min(100, widthPercent)}%`,
+                                            minWidth: '120px'
+                                          }}
+                                          title={`${goal.componentName} - ${formatDateRange(goal.startDate, goal.targetDate)}`}
+                                        >
+                                          <div className="p-2 h-full flex flex-col justify-between">
+                                            <div className="font-medium text-xs leading-tight truncate">{goal.componentName}</div>
+                                            {goal.productName && <div className="text-[10px] text-gray-500 truncate">{goal.productName}</div>}
+                                            <div className="text-xs opacity-75 leading-tight">
+                                              {formatDateRange(goal.startDate, goal.targetDate)}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                                <div
+                                                  className="h-1.5 rounded-full transition-all duration-300 bg-blue-500"
+                                                  style={{ width: `${goal.progress}%` }}
+                                                ></div>
+                                              </div>
+                                              <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{goal.progress}%</span>
+                                            </div>
                                           </div>
-                                          <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{goal.progress}%</span>
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+
+                                  {/* Next Period Column - Empty */}
+                                  <div className="relative">
+                                    {/* No tasks shown in next period */}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className={`${granularity === 'months' ? 'grid grid-cols-4' : 'flex w-full'} h-20 relative`}>
+                                  {/* Single task as continuous bar across the full timeline */}
+                                  {(() => {
+                                    const startDate = new Date(goal.startDate);
+                                    const endDate = new Date(goal.targetDate);
+
+                                    // Calculate position relative to the entire timeline
+                                    const timelineStart = timelineData[0]?.start || new Date();
+                                    const timelineEnd = timelineData[timelineData.length - 1]?.end || new Date();
+                                    const totalTimelineDuration = timelineEnd.getTime() - timelineStart.getTime();
+
+                                    // Only show tasks that overlap with the visible timeline
+                                    if (endDate.getTime() < timelineStart.getTime() || startDate.getTime() > timelineEnd.getTime()) {
+                                      return null;
+                                    }
+
+                                    // Calculate task position and width relative to entire timeline
+                                    // Clamp task start and end to timeline boundaries
+                                    const clampedTaskStart = Math.max(startDate.getTime(), timelineStart.getTime());
+                                    const clampedTaskEnd = Math.min(endDate.getTime(), timelineEnd.getTime());
+
+                                    const taskStartPercent = ((clampedTaskStart - timelineStart.getTime()) / totalTimelineDuration) * 100;
+                                    const taskEndPercent = ((clampedTaskEnd - timelineStart.getTime()) / totalTimelineDuration) * 100;
+                                    const taskWidthPercent = taskEndPercent - taskStartPercent;
+
+                                    return (
+                                      <div
+                                        className={`absolute top-2 h-16 rounded-md border-l-4 ${getGoalColor(goal.status)} ${getBorderColor(goal.status)} cursor-pointer hover:shadow-md transition-shadow`}
+                                        style={{
+                                          left: `${Math.max(0, taskStartPercent)}%`,
+                                          width: `${Math.min(100, taskWidthPercent)}%`,
+                                          minWidth: '120px'
+                                        }}
+                                        title={`${goal.componentName} - ${formatDateRange(goal.startDate, goal.targetDate)}`}
+                                      >
+                                        <div className="p-2 h-full flex flex-col justify-between">
+                                          <div className="font-medium text-xs leading-tight truncate">{goal.componentName}</div>
+                                          {goal.productName && <div className="text-[10px] text-gray-500 truncate">{goal.productName}</div>}
+                                          <div className="text-xs opacity-75 leading-tight">
+                                            {formatDateRange(goal.startDate, goal.targetDate)}
+                                          </div>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                              <div
+                                                className="h-1.5 rounded-full transition-all duration-300 bg-blue-500"
+                                                style={{ width: `${goal.progress}%` }}
+                                              ></div>
+                                            </div>
+                                            <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{goal.progress}%</span>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
                         ))}
                       </div>
                     )}
@@ -659,6 +631,7 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('all');
   const [granularity, setGranularity] = useState<'quarterly' | 'months' | 'weeks'>('quarterly');
 
   useEffect(() => {
@@ -666,17 +639,33 @@ export default function GoalsPage() {
       const timeoutId = setTimeout(() => {
         setIsLoading(false);
       }, 10000);
-      
+
       try {
         const { data: goalData, error: goalError } = await supabase
           .from('pb_components')
-          .select('id, name, description, startdate, targetdate, status, progress, created_at')
+          .select(`
+            id, name, description, startdate, targetdate, status, progress, created_at,
+            pb_subproducts!inner (
+              product_id,
+              pb_products!inner (
+                name
+              )
+            )
+          `)
           .not('startdate', 'is', null)
           .not('targetdate', 'is', null);
 
         if (goalError) throw goalError;
 
-        const formattedGoals: Goal[] = goalData.length > 0 ? goalData.map(goal => ({
+        // Apply product filter if specific product is selected
+        let filteredGoalsData = goalData || [];
+        if (selectedProductId !== 'all') {
+          filteredGoalsData = (goalData || []).filter((goal: any) =>
+            goal.pb_subproducts?.product_id === selectedProductId
+          );
+        }
+
+        const formattedGoals: Goal[] = filteredGoalsData.length > 0 ? filteredGoalsData.map(goal => ({
           id: goal.id,
           componentName: goal.name,
           progress: goal.progress || 0,
@@ -684,6 +673,7 @@ export default function GoalsPage() {
           targetDate: goal.targetdate,
           status: goal.status || 'Todo',
           color: 'blue',
+          productName: (goal as any).pb_subproducts?.pb_products?.name || 'No Product',
           created_at: goal.created_at || new Date().toISOString()
         })) : [];
 
@@ -700,7 +690,15 @@ export default function GoalsPage() {
     };
 
     fetchData();
-  }, []);
+  }, [selectedProductId]);
+
+  const handleProductSelect = (productIds: string[]) => {
+    if (productIds.length > 1 || productIds.length === 0) {
+      setSelectedProductId('all');
+    } else {
+      setSelectedProductId(productIds[0]);
+    }
+  };
 
   if (isLoading) {
     return <GoalsSkeleton />;
@@ -714,8 +712,10 @@ export default function GoalsPage() {
           <div className="max-w-full mx-auto">
             <header className="flex justify-between items-center p-4 bg-white border-b">
               <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-6 w-6 text-blue-500" />
-                <h1 className="text-xl font-semibold">Goals Roadmap</h1>
+                <div className="p-1 bg-white text-gray-400 rounded-md">
+                  <CheckCircleIcon className="h-6 w-6 text-blue-500" />
+                </div>
+                <ProductDropdown onProductSelect={handleProductSelect} />
               </div>
             </header>
             <div className="flex items-center justify-center h-96">
@@ -732,7 +732,7 @@ export default function GoalsPage() {
   }
 
   return (
-    <GoalsBoard 
+    <GoalsBoard
       currentDate={currentDate}
       setCurrentDate={setCurrentDate}
       goals={goals}
