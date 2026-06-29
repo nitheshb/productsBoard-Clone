@@ -132,3 +132,21 @@ export interface Version {
   updated_at: string;
 }
 
+export type TaskIssueType = 'Story' | 'Task' | 'Bug';
+export type TaskStatus = 'To Do' | 'In Progress' | 'Done';
+export type TaskPriority = 'Highest' | 'High' | 'Medium' | 'Low' | 'Lowest';
+
+export interface BoardTask {
+  id: string;
+  ticket_key: string;
+  summary: string;
+  description?: string;
+  issue_type: TaskIssueType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee: string;
+  assignee_id?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
