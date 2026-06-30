@@ -163,6 +163,74 @@ function taskMatchesDateFilter(
 const TASK_PRIORITIES = ['Highest', 'High', 'Medium', 'Low', 'Lowest'];
 const TASK_ISSUE_TYPES = ['Story', 'Task', 'Bug'];
 
+type QuickFilterId = 'all' | 'active' | 'thisWeek' | 'overdue' | 'completed' | 'currentSprint';
+
+const QUICK_FILTERS: Array<{ id: QuickFilterId; label: string }> = [
+  { id: 'all', label: 'All Tasks' },
+  { id: 'active', label: 'Active Tasks' },
+  { id: 'thisWeek', label: 'This Week' },
+  { id: 'overdue', label: 'Overdue' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'currentSprint', label: 'Current Sprint' },
+];
+
+function getWeekBounds(today: Date = new Date()): { start: Date; end: Date } {
+  // Monday → Sunday week, matching the existing date filter's day-precision style.
+  const day = today.getDay();
+  const diffToMonday = (day + 6) % 7;
+  const start = new Date(today);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - diffToMonday);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function sprintEndAsDate(sprint?: Sprint): Date | null {
+  if (!sprint?.end_date) return null;
+  const d = new Date(`${sprint.end_date}T23:59:59`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function isTaskOverdue(task: BoardTask, sprintsById: Map<string, Sprint>): boolean {
+  if (task.status === 'Done') return false;
+  if (!task.sprint_id) return false;
+  const end = sprintEndAsDate(sprintsById.get(task.sprint_id));
+  if (!end) return false;
+  return end.getTime() < Date.now();
+}
+
+function taskMatchesQuickFilter(
+  task: BoardTask,
+  quickFilter: QuickFilterId,
+  context: {
+    weekStart: Date;
+    weekEnd: Date;
+    activeSprintId: string | null;
+    sprintsById: Map<string, Sprint>;
+  }
+): boolean {
+  switch (quickFilter) {
+    case 'all':
+      return true;
+    case 'active':
+      return task.status !== 'Done';
+    case 'completed':
+      return task.status === 'Done';
+    case 'thisWeek': {
+      const created = new Date(task.created_at);
+      return created >= context.weekStart && created <= context.weekEnd;
+    }
+    case 'overdue':
+      return isTaskOverdue(task, context.sprintsById);
+    case 'currentSprint':
+      return Boolean(context.activeSprintId) && task.sprint_id === context.activeSprintId;
+    default:
+      return true;
+  }
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<BoardTask[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -183,6 +251,18 @@ export default function TasksPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all');
+
+  const sprintsById = useMemo(() => {
+    return new Map(sprints.map((s) => [s.id, s]));
+  }, [sprints]);
+
+  const activeSprintId = useMemo(() => {
+    const active = sprints.find((s) => s.status === 'Active');
+    return active ? active.id : null;
+  }, [sprints]);
+
+  const weekBounds = useMemo(() => getWeekBounds(), []);
 
   const fetchSprints = useCallback(async () => {
     try {
@@ -245,10 +325,17 @@ export default function TasksPage() {
     selectedVersions.length > 0 ||
     selectedTaskTypes.length > 0 ||
     selectedSprintIds.length > 0 ||
+    quickFilter !== 'all' ||
     Boolean(startDate) ||
     Boolean(endDate);
 
   const filterAppliedTasks = useMemo(() => {
+    const quickCtx = {
+      weekStart: weekBounds.start,
+      weekEnd: weekBounds.end,
+      activeSprintId,
+      sprintsById,
+    };
     return tasks.filter(
       (task) =>
         taskMatchesTeamFilter(task, selectedTeams) &&
@@ -256,7 +343,8 @@ export default function TasksPage() {
         taskMatchesPriorityFilter(task, selectedVersions) &&
         taskMatchesIssueTypeFilter(task, selectedTaskTypes) &&
         taskMatchesSprintFilter(task, selectedSprintIds) &&
-        taskMatchesDateFilter(task, startDate, endDate)
+        taskMatchesDateFilter(task, startDate, endDate) &&
+        taskMatchesQuickFilter(task, quickFilter, quickCtx)
     );
   }, [
     tasks,
@@ -267,6 +355,11 @@ export default function TasksPage() {
     selectedSprintIds,
     startDate,
     endDate,
+    quickFilter,
+    weekBounds.start,
+    weekBounds.end,
+    activeSprintId,
+    sprintsById,
   ]);
 
   const filteredTasks = useMemo(() => {
@@ -400,6 +493,7 @@ export default function TasksPage() {
     setSelectedSprintIds([]);
     setStartDate(undefined);
     setEndDate(undefined);
+    setQuickFilter('all');
   };
 
   return (
@@ -454,6 +548,47 @@ export default function TasksPage() {
             </button>
           </header>
 
+          <div className="px-6 pt-3 pb-2 border-b bg-white flex flex-wrap items-center gap-2">
+            {QUICK_FILTERS.map((qf) => {
+              const isActive = quickFilter === qf.id;
+              const disabled = qf.id === 'currentSprint' && !activeSprintId;
+              const count = (() => {
+                if (qf.id === 'all') return tasks.length;
+                return tasks.filter((t) =>
+                  taskMatchesQuickFilter(t, qf.id, {
+                    weekStart: weekBounds.start,
+                    weekEnd: weekBounds.end,
+                    activeSprintId,
+                    sprintsById,
+                  })
+                ).length;
+              })();
+              return (
+                <button
+                  key={qf.id}
+                  type="button"
+                  onClick={() => !disabled && setQuickFilter(qf.id)}
+                  disabled={disabled}
+                  title={disabled ? 'No active sprint right now' : undefined}
+                  className={`h-8 inline-flex items-center gap-1.5 px-3 rounded-full text-xs font-medium border transition-colors ${
+                    isActive
+                      ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {qf.label}
+                  <span
+                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="px-6 py-3 border-b bg-white">
             <FilterContainer
               selectedTeams={selectedTeams}
@@ -504,7 +639,9 @@ export default function TasksPage() {
                 <p className="text-gray-500 text-sm mb-4">
                   {isSearching
                     ? `No members or tasks found for "${searchQuery}".`
-                    : 'No tasks match the selected filters.'}
+                    : quickFilter !== 'all'
+                      ? `No tasks found for "${QUICK_FILTERS.find((q) => q.id === quickFilter)?.label}".`
+                      : 'No tasks match the selected filters.'}
                 </p>
                 <div className="flex gap-3">
                   {isSearching && (
@@ -603,11 +740,17 @@ export default function TasksPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {group.tasks.map((task) => (
+                              {group.tasks.map((task) => {
+                                const overdue = isTaskOverdue(task, sprintsById);
+                                return (
                                 <tr
                                   key={task.id}
                                   onClick={() => openEditTask(task)}
-                                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors group cursor-pointer"
+                                  className={`border-b border-gray-50 transition-colors group cursor-pointer ${
+                                    overdue
+                                      ? 'bg-red-50/60 hover:bg-red-100/70 border-l-2 border-l-red-400'
+                                      : 'hover:bg-gray-50'
+                                  }`}
                                 >
                                   <td className="py-3 px-4">
                                     <span className="text-sm text-blue-600 font-medium hover:underline">
@@ -657,7 +800,8 @@ export default function TasksPage() {
                                     )}
                                   </td>
                                 </tr>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}
