@@ -7,6 +7,8 @@ import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/ap
 import { fetchExistingTeamMembers, teamEventEmitter, TeamMember } from '@/utils/teamUtils';
 import { FilterContainer } from '@/components/filters/filtercontainer';
 import { NO_SPRINT_VALUE } from '@/components/filters/SprintFilter';
+import { ActualTimeDialog } from './_components/ActualTimeDialog';
+import { computeVariance, formatDuration } from '@/lib/timeUtils';
 import {
   MagnifyingGlassIcon,
   ChevronDownIcon,
@@ -252,6 +254,7 @@ export default function TasksPage() {
   const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all');
+  const [actualTimePromptTask, setActualTimePromptTask] = useState<BoardTask | null>(null);
 
   const sprintsById = useMemo(() => {
     return new Map(sprints.map((s) => [s.id, s]));
@@ -451,18 +454,38 @@ export default function TasksPage() {
     setExpandedMembers((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
-  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+  const persistStatusChange = async (
+    taskId: string,
+    newStatus: TaskStatus,
+    actualMinutes?: number
+  ) => {
+    const body: Record<string, unknown> = { status: newStatus };
+    if (actualMinutes !== undefined) body.actual_minutes = actualMinutes;
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Failed to update status');
+    await fetchTasks();
+  };
+
+  const handleStatusChange = async (task: BoardTask, newStatus: TaskStatus) => {
+    if (newStatus === 'Done' && task.actual_minutes == null) {
+      setActualTimePromptTask(task);
+      return;
+    }
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error('Failed to update status');
-      await fetchTasks();
+      await persistStatusChange(task.id, newStatus);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleActualTimeConfirm = async (actualMinutes: number) => {
+    if (!actualTimePromptTask) return;
+    await persistStatusChange(actualTimePromptTask.id, 'Done', actualMinutes);
+    setActualTimePromptTask(null);
   };
 
   const openCreateFor = (memberName?: string) => {
@@ -737,6 +760,8 @@ export default function TasksPage() {
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-36">Status</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-28">Priority</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-32">Sprint</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-24">Estimated</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-28">Actual</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -770,7 +795,7 @@ export default function TasksPage() {
                                     <select
                                       value={task.status}
                                       onChange={(e) =>
-                                        handleStatusChange(task.id, e.target.value as TaskStatus)
+                                        handleStatusChange(task, e.target.value as TaskStatus)
                                       }
                                       className={`text-xs font-medium uppercase tracking-wide rounded px-2 py-0.5 border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 ${
                                         task.status === 'To Do'
@@ -799,6 +824,37 @@ export default function TasksPage() {
                                       <span className="text-xs text-gray-400 italic">No Sprint</span>
                                     )}
                                   </td>
+                                  <td className="py-3 px-4">
+                                    <span className="text-sm text-gray-700 font-mono">
+                                      {formatDuration(task.estimated_minutes ?? null)}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {(() => {
+                                      const variance = computeVariance(
+                                        task.estimated_minutes,
+                                        task.actual_minutes
+                                      );
+                                      const toneClass =
+                                        variance?.tone === 'over'
+                                          ? 'text-red-600'
+                                          : variance?.tone === 'under'
+                                            ? 'text-green-600'
+                                            : 'text-gray-500';
+                                      return (
+                                        <div className="flex flex-col leading-tight">
+                                          <span className="text-sm text-gray-700 font-mono">
+                                            {formatDuration(task.actual_minutes ?? null)}
+                                          </span>
+                                          {variance && (
+                                            <span className={`text-[10px] ${toneClass}`}>
+                                              {variance.label}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
                                 </tr>
                                 );
                               })}
@@ -823,6 +879,14 @@ export default function TasksPage() {
         task={selectedTask}
         defaultAssignee={createForMember}
         onSaved={fetchTasks}
+      />
+
+      <ActualTimeDialog
+        isOpen={Boolean(actualTimePromptTask)}
+        taskKey={actualTimePromptTask?.ticket_key}
+        estimatedMinutes={actualTimePromptTask?.estimated_minutes ?? null}
+        onCancel={() => setActualTimePromptTask(null)}
+        onConfirm={handleActualTimeConfirm}
       />
     </div>
   );

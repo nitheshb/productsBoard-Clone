@@ -60,6 +60,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (
+      body.estimated_minutes === undefined ||
+      body.estimated_minutes === null ||
+      typeof body.estimated_minutes !== 'number' ||
+      !isFinite(body.estimated_minutes) ||
+      body.estimated_minutes <= 0
+    ) {
+      return NextResponse.json(
+        { error: 'Estimated time is required and must be greater than zero' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      body.actual_minutes !== undefined &&
+      body.actual_minutes !== null &&
+      (typeof body.actual_minutes !== 'number' ||
+        !isFinite(body.actual_minutes) ||
+        body.actual_minutes < 0)
+    ) {
+      return NextResponse.json(
+        { error: 'Actual time cannot be negative' },
+        { status: 400 }
+      );
+    }
+
     const ticketKey = await generateTicketKey();
 
     const { data, error } = await supabase
@@ -74,6 +100,9 @@ export async function POST(request: NextRequest) {
         assignee: body.assignee,
         assignee_id: body.assignee_id || null,
         sprint_id: body.sprint_id || null,
+        estimated_minutes: Math.round(body.estimated_minutes),
+        actual_minutes:
+          typeof body.actual_minutes === 'number' ? Math.round(body.actual_minutes) : null,
       }])
       .select()
       .single();

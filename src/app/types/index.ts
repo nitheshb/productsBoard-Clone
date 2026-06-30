@@ -148,6 +148,8 @@ export interface BoardTask {
   assignee_id?: string | null;
   sprint_id?: string | null;
   sprint_name?: string | null;
+  estimated_minutes?: number | null;
+  actual_minutes?: number | null;
   created_at: string;
   updated_at?: string;
 }

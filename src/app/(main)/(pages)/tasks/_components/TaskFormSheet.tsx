@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
 import { TeamMember } from '@/utils/teamUtils';
+import { parseDuration, formatDuration } from '@/lib/timeUtils';
 
 interface TaskFormSheetProps {
   open: boolean;
@@ -57,6 +58,8 @@ export default function TaskFormSheet({
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [assignee, setAssignee] = useState('');
   const [sprintId, setSprintId] = useState<string>('');
+  const [estimatedInput, setEstimatedInput] = useState('');
+  const [actualInput, setActualInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,6 +74,10 @@ export default function TaskFormSheet({
       setPriority(task.priority);
       setAssignee(task.assignee);
       setSprintId(task.sprint_id || '');
+      setEstimatedInput(
+        task.estimated_minutes != null ? formatDuration(task.estimated_minutes) : ''
+      );
+      setActualInput(task.actual_minutes != null ? formatDuration(task.actual_minutes) : '');
     } else {
       setSummary('');
       setDescription('');
@@ -79,6 +86,8 @@ export default function TaskFormSheet({
       setPriority('Medium');
       setAssignee(defaultAssignee || '');
       setSprintId('');
+      setEstimatedInput('');
+      setActualInput('');
     }
     setError('');
   }, [open, task, defaultAssignee]);
@@ -88,6 +97,23 @@ export default function TaskFormSheet({
     if (!summary.trim() || !assignee) {
       setError('Summary and assigned member are required');
       return;
+    }
+
+    const estimatedMinutes = parseDuration(estimatedInput);
+    if (estimatedMinutes === null || estimatedMinutes <= 0) {
+      setError('Estimated time is required (e.g. 30m, 2h, 1d)');
+      return;
+    }
+
+    let actualMinutes: number | null = null;
+    const trimmedActual = actualInput.trim();
+    if (trimmedActual) {
+      const parsed = parseDuration(trimmedActual);
+      if (parsed === null || parsed < 0) {
+        setError('Actual time format is invalid (e.g. 45m, 2h, 1d)');
+        return;
+      }
+      actualMinutes = parsed;
     }
 
     setIsSubmitting(true);
@@ -104,6 +130,8 @@ export default function TaskFormSheet({
         assignee,
         assignee_id: member?.id || null,
         sprint_id: sprintId || null,
+        estimated_minutes: estimatedMinutes,
+        actual_minutes: actualMinutes,
       };
 
       const res = await fetch(isEditMode ? `/api/tasks/${task!.id}` : '/api/tasks', {
@@ -237,6 +265,37 @@ export default function TaskFormSheet({
                   No sprints exist yet. Create one from the Sprints page to assign tasks to it.
                 </p>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
+              <div className="space-y-2">
+                <Label htmlFor="estimated">Estimated Time *</Label>
+                <Input
+                  id="estimated"
+                  placeholder="e.g. 30m, 2h, 1d"
+                  value={estimatedInput}
+                  onChange={(e) => setEstimatedInput(e.target.value)}
+                />
+                <p className="text-[11px] text-gray-500">
+                  Use m / h / d (1d = 8h). Combine like &quot;1d 2h&quot;.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="actual">
+                  Actual Time {status === 'Done' && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  id="actual"
+                  placeholder={status === 'Done' ? 'How long did it take? e.g. 2h' : '—'}
+                  value={actualInput}
+                  onChange={(e) => setActualInput(e.target.value)}
+                />
+                <p className="text-[11px] text-gray-500">
+                  {status === 'Done'
+                    ? 'Fill this in when completing the task.'
+                    : 'Leave empty until the task is completed.'}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full min-w-0">

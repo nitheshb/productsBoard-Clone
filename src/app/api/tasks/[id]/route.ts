@@ -22,6 +22,40 @@ export async function PUT(
     if (body.assignee_id !== undefined) updateData.assignee_id = body.assignee_id;
     if (body.sprint_id !== undefined) updateData.sprint_id = body.sprint_id || null;
 
+    if (body.estimated_minutes !== undefined) {
+      if (body.estimated_minutes === null) {
+        updateData.estimated_minutes = null;
+      } else if (
+        typeof body.estimated_minutes !== 'number' ||
+        !isFinite(body.estimated_minutes) ||
+        body.estimated_minutes <= 0
+      ) {
+        return NextResponse.json(
+          { error: 'Estimated time must be greater than zero' },
+          { status: 400 }
+        );
+      } else {
+        updateData.estimated_minutes = Math.round(body.estimated_minutes);
+      }
+    }
+
+    if (body.actual_minutes !== undefined) {
+      if (body.actual_minutes === null) {
+        updateData.actual_minutes = null;
+      } else if (
+        typeof body.actual_minutes !== 'number' ||
+        !isFinite(body.actual_minutes) ||
+        body.actual_minutes < 0
+      ) {
+        return NextResponse.json(
+          { error: 'Actual time cannot be negative' },
+          { status: 400 }
+        );
+      } else {
+        updateData.actual_minutes = Math.round(body.actual_minutes);
+      }
+    }
+
     const { data, error } = await supabase
       .from('pb_tasks')
       .update(updateData)
