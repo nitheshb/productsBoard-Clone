@@ -13,13 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { BoardTask, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
+import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
 import { TeamMember } from '@/utils/teamUtils';
 
 interface TaskFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: TeamMember[];
+  sprints?: Sprint[];
   task?: BoardTask | null;
   defaultAssignee?: string;
   onSaved: () => void;
@@ -42,6 +43,7 @@ export default function TaskFormSheet({
   open,
   onOpenChange,
   members,
+  sprints = [],
   task,
   defaultAssignee,
   onSaved,
@@ -54,6 +56,7 @@ export default function TaskFormSheet({
   const [status, setStatus] = useState<TaskStatus>('To Do');
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [assignee, setAssignee] = useState('');
+  const [sprintId, setSprintId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -67,6 +70,7 @@ export default function TaskFormSheet({
       setStatus(task.status);
       setPriority(task.priority);
       setAssignee(task.assignee);
+      setSprintId(task.sprint_id || '');
     } else {
       setSummary('');
       setDescription('');
@@ -74,6 +78,7 @@ export default function TaskFormSheet({
       setStatus('To Do');
       setPriority('Medium');
       setAssignee(defaultAssignee || '');
+      setSprintId('');
     }
     setError('');
   }, [open, task, defaultAssignee]);
@@ -98,6 +103,7 @@ export default function TaskFormSheet({
         priority,
         assignee,
         assignee_id: member?.id || null,
+        sprint_id: sprintId || null,
       };
 
       const res = await fetch(isEditMode ? `/api/tasks/${task!.id}` : '/api/tasks', {
@@ -209,6 +215,28 @@ export default function TaskFormSheet({
                 rows={3}
                 className="w-full max-w-full box-border resize-none"
               />
+            </div>
+
+            <div className="space-y-2 w-full min-w-0">
+              <Label htmlFor="sprint">Sprint</Label>
+              <select
+                id="sprint"
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— Unassigned (no sprint) —</option>
+                {sprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name} ({sprint.status})
+                  </option>
+                ))}
+              </select>
+              {sprints.length === 0 && (
+                <p className="text-xs text-gray-500">
+                  No sprints exist yet. Create one from the Sprints page to assign tasks to it.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full min-w-0">

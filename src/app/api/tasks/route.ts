@@ -24,12 +24,22 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('pb_tasks')
-      .select('*')
+      .select('*, sprint:pb_sprints(id, name)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    return NextResponse.json({ tasks: data || [] });
+    const tasks = (data || []).map((row: Record<string, unknown>) => {
+      const sprint = row.sprint as { id: string; name: string } | null | undefined;
+      const { sprint: _sprint, ...rest } = row;
+      void _sprint;
+      return {
+        ...rest,
+        sprint_name: sprint?.name ?? null,
+      };
+    });
+
+    return NextResponse.json({ tasks });
   } catch (error: unknown) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json(
@@ -63,6 +73,7 @@ export async function POST(request: NextRequest) {
         priority: body.priority || 'Medium',
         assignee: body.assignee,
         assignee_id: body.assignee_id || null,
+        sprint_id: body.sprint_id || null,
       }])
       .select()
       .single();

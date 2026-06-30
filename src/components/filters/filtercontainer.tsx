@@ -9,6 +9,8 @@ import { StatusFilter } from './StatusFilter';
 import { VersionFilter } from './VersionFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
 import { DateFilter } from './DateFilter';
+import { SprintFilter, NO_SPRINT_VALUE } from './SprintFilter';
+import type { Sprint } from '@/app/types';
 
 interface FilterContainerProps {
   selectedTeams: Array<string | TeamMember>;
@@ -21,6 +23,9 @@ interface FilterContainerProps {
   availableStatuses: string[];
   availableVersions: string[];
   availableTaskTypes: string[];
+  selectedSprintIds?: string[];
+  availableSprints?: Sprint[];
+  onSprintSelect?: (ids: string[]) => void;
   onTeamSelect: (teams: Array<string | TeamMember>) => void;
   onStatusSelect: (statuses: string[]) => void;
   onVersionSelect: (versions: string[]) => void;
@@ -40,6 +45,9 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
   availableStatuses,
   availableVersions,
   availableTaskTypes,
+  selectedSprintIds,
+  availableSprints,
+  onSprintSelect,
   onTeamSelect,
   onStatusSelect,
   onVersionSelect,
@@ -47,6 +55,11 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
   onDateChange,
   onClearFilters,
 }) => {
+  const sprintFilterEnabled =
+    Array.isArray(selectedSprintIds) && Array.isArray(availableSprints) && Boolean(onSprintSelect);
+  const sprintNameById = new Map<string, string>(
+    (availableSprints || []).map((s) => [s.id, s.name])
+  );
   const [localAvailableTeams, setLocalAvailableTeams] = useState<Array<string | TeamMember>>(availableTeams || []);
 
   // If parent didn't supply availableTeams, or it's empty, fetch from pb_employees
@@ -62,11 +75,12 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
     }
     return () => { mounted = false; };
   }, [availableTeams]);
-  const hasActiveFilters = selectedTeams.length > 0 || 
-                          selectedStatuses.length > 0 || 
-                          selectedVersions.length > 0 || 
+  const hasActiveFilters = selectedTeams.length > 0 ||
+                          selectedStatuses.length > 0 ||
+                          selectedVersions.length > 0 ||
                           selectedTaskTypes.length > 0 ||
-                          startDate || 
+                          (sprintFilterEnabled && (selectedSprintIds?.length || 0) > 0) ||
+                          startDate ||
                           endDate;
 
   return (
@@ -101,6 +115,14 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
           availableTaskTypes={availableTaskTypes}
           onTaskTypeSelect={onTaskTypeSelect}
         />
+
+        {sprintFilterEnabled && (
+          <SprintFilter
+            selectedSprintIds={selectedSprintIds || []}
+            availableSprints={availableSprints || []}
+            onSprintSelect={onSprintSelect!}
+          />
+        )}
 
         {hasActiveFilters && (
           <Button 
@@ -181,7 +203,7 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
             <Badge key={taskType} variant="secondary" className="text-xs bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
               <span className="mr-1">🏷️</span>
               {taskType}
-              <button 
+              <button
                 onClick={() => onTaskTypeSelect(selectedTaskTypes.filter(t => t !== taskType))}
                 className="ml-1 rounded-full hover:bg-indigo-300 h-4 w-4 flex items-center justify-center transition-colors"
               >
@@ -189,6 +211,31 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
               </button>
             </Badge>
           ))}
+
+          {sprintFilterEnabled && (selectedSprintIds || []).map((sprintId) => {
+            const label =
+              sprintId === NO_SPRINT_VALUE
+                ? 'No Sprint'
+                : sprintNameById.get(sprintId) || 'Sprint';
+            return (
+              <Badge
+                key={sprintId}
+                variant="secondary"
+                className="text-xs bg-sky-100 text-sky-800 hover:bg-sky-200"
+              >
+                <span className="mr-1">🔄</span>
+                {label}
+                <button
+                  onClick={() =>
+                    onSprintSelect!((selectedSprintIds || []).filter((s) => s !== sprintId))
+                  }
+                  className="ml-1 rounded-full hover:bg-sky-300 h-4 w-4 flex items-center justify-center transition-colors"
+                >
+                  ×
+                </button>
+              </Badge>
+            );
+          })}
 
           
           {(startDate || endDate) && (

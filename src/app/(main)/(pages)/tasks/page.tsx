@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Sidebar from '@/app/(main)/(pages)/product/_components/sidebar';
 import TaskFormSheet from './_components/TaskFormSheet';
-import { BoardTask, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
+import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
 import { fetchExistingTeamMembers, teamEventEmitter, TeamMember } from '@/utils/teamUtils';
 import { FilterContainer } from '@/components/filters/filtercontainer';
+import { NO_SPRINT_VALUE } from '@/components/filters/SprintFilter';
 import {
   MagnifyingGlassIcon,
   ChevronDownIcon,
@@ -128,6 +129,12 @@ function taskMatchesIssueTypeFilter(task: BoardTask, selectedTypes: string[]): b
   return selectedTypes.includes(task.issue_type);
 }
 
+function taskMatchesSprintFilter(task: BoardTask, selectedSprintIds: string[]): boolean {
+  if (selectedSprintIds.length === 0) return true;
+  if (!task.sprint_id) return selectedSprintIds.includes(NO_SPRINT_VALUE);
+  return selectedSprintIds.includes(task.sprint_id);
+}
+
 function taskMatchesDateFilter(
   task: BoardTask,
   startDate?: Date,
@@ -171,9 +178,22 @@ export default function TasksPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [selectedTaskTypes, setSelectedTaskTypes] = useState<string[]>([]);
+  const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+
+  const fetchSprints = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sprints');
+      if (!res.ok) return;
+      const data = await res.json();
+      setSprints(data.sprints || []);
+    } catch {
+      // Sprint table may not exist yet; the Sprints page surfaces the migration hint.
+    }
+  }, []);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -197,13 +217,14 @@ export default function TasksPage() {
       const [membersData] = await Promise.all([
         fetchExistingTeamMembers(true),
         fetchTasks(),
+        fetchSprints(),
       ]);
       setMembers(membersData);
       setAvailableTeams(membersData);
       setIsLoading(false);
     }
     load();
-  }, [fetchTasks]);
+  }, [fetchTasks, fetchSprints]);
 
   useEffect(() => {
     const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
@@ -223,6 +244,7 @@ export default function TasksPage() {
     selectedStatuses.length > 0 ||
     selectedVersions.length > 0 ||
     selectedTaskTypes.length > 0 ||
+    selectedSprintIds.length > 0 ||
     Boolean(startDate) ||
     Boolean(endDate);
 
@@ -233,9 +255,19 @@ export default function TasksPage() {
         taskMatchesStatusFilter(task, selectedStatuses) &&
         taskMatchesPriorityFilter(task, selectedVersions) &&
         taskMatchesIssueTypeFilter(task, selectedTaskTypes) &&
+        taskMatchesSprintFilter(task, selectedSprintIds) &&
         taskMatchesDateFilter(task, startDate, endDate)
     );
-  }, [tasks, selectedTeams, selectedStatuses, selectedVersions, selectedTaskTypes, startDate, endDate]);
+  }, [
+    tasks,
+    selectedTeams,
+    selectedStatuses,
+    selectedVersions,
+    selectedTaskTypes,
+    selectedSprintIds,
+    startDate,
+    endDate,
+  ]);
 
   const filteredTasks = useMemo(() => {
     const keywords = getSearchKeywords(searchQuery);
@@ -365,6 +397,7 @@ export default function TasksPage() {
     setSelectedStatuses([]);
     setSelectedVersions([]);
     setSelectedTaskTypes([]);
+    setSelectedSprintIds([]);
     setStartDate(undefined);
     setEndDate(undefined);
   };
@@ -427,6 +460,9 @@ export default function TasksPage() {
               selectedStatuses={selectedStatuses}
               selectedVersions={selectedVersions}
               selectedTaskTypes={selectedTaskTypes}
+              selectedSprintIds={selectedSprintIds}
+              availableSprints={sprints}
+              onSprintSelect={setSelectedSprintIds}
               startDate={startDate}
               endDate={endDate}
               availableTeams={availableTeams}
@@ -563,6 +599,7 @@ export default function TasksPage() {
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-32">Issue Type</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-36">Status</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-28">Priority</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-32">Sprint</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -610,6 +647,15 @@ export default function TasksPage() {
                                   <td className="py-3 px-4">
                                     <PriorityBadge priority={task.priority} />
                                   </td>
+                                  <td className="py-3 px-4">
+                                    {task.sprint_name ? (
+                                      <span className="inline-flex items-center text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded px-2 py-0.5">
+                                        {task.sprint_name}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400 italic">No Sprint</span>
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -629,6 +675,7 @@ export default function TasksPage() {
         open={isSheetOpen}
         onOpenChange={handleSheetOpenChange}
         members={members}
+        sprints={sprints}
         task={selectedTask}
         defaultAssignee={createForMember}
         onSaved={fetchTasks}

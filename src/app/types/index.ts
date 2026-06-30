@@ -146,7 +146,34 @@ export interface BoardTask {
   priority: TaskPriority;
   assignee: string;
   assignee_id?: string | null;
+  sprint_id?: string | null;
+  sprint_name?: string | null;
   created_at: string;
   updated_at?: string;
+}
+
+export type SprintStatus = 'Upcoming' | 'Active' | 'Completed';
+
+export interface Sprint {
+  id: string;
+  name: string;
+  description?: string | null;
+  start_date: string;
+  end_date: string;
+  status: SprintStatus;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SprintStats {
+  total: number;
+  completed: number;
+  in_progress: number;
+  pending: number;
+  completion_percentage: number;
+}
+
+export interface SprintWithStats extends Sprint {
+  stats: SprintStats;
 }
 

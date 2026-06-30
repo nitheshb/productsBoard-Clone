@@ -20,6 +20,7 @@ export async function PUT(
     if (body.priority !== undefined) updateData.priority = body.priority;
     if (body.assignee !== undefined) updateData.assignee = body.assignee;
     if (body.assignee_id !== undefined) updateData.assignee_id = body.assignee_id;
+    if (body.sprint_id !== undefined) updateData.sprint_id = body.sprint_id || null;
 
     const { data, error } = await supabase
       .from('pb_tasks')
