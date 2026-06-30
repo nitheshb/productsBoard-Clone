@@ -101,7 +101,7 @@ export default function TaskFormSheet({
 
     const estimatedMinutes = parseDuration(estimatedInput);
     if (estimatedMinutes === null || estimatedMinutes <= 0) {
-      setError('Estimated time is required (e.g. 30m, 2h, 1d)');
+      setError('Estimated time is required (e.g. 30 min, 1 hr, 2 hours, 1 day)');
       return;
     }
 
@@ -110,7 +110,7 @@ export default function TaskFormSheet({
     if (trimmedActual) {
       const parsed = parseDuration(trimmedActual);
       if (parsed === null || parsed < 0) {
-        setError('Actual time format is invalid (e.g. 45m, 2h, 1d)');
+        setError('Actual time format is invalid (e.g. 45 min, 2 hr, 1 day)');
         return;
       }
       actualMinutes = parsed;
@@ -272,12 +272,13 @@ export default function TaskFormSheet({
                 <Label htmlFor="estimated">Estimated Time *</Label>
                 <Input
                   id="estimated"
-                  placeholder="e.g. 30m, 2h, 1d"
+                  placeholder="e.g. 30 min, 1 hr, 2 hours, 1 day"
                   value={estimatedInput}
                   onChange={(e) => setEstimatedInput(e.target.value)}
                 />
                 <p className="text-[11px] text-gray-500">
-                  Use m / h / d (1d = 8h). Combine like &quot;1d 2h&quot;.
+                  Accepts min / hr / day (or m / h / d). 1 day = 8 hours. You can combine, e.g.
+                  &quot;1 day 2 hours&quot;.
                 </p>
               </div>
               <div className="space-y-2">
@@ -286,7 +287,7 @@ export default function TaskFormSheet({
                 </Label>
                 <Input
                   id="actual"
-                  placeholder={status === 'Done' ? 'How long did it take? e.g. 2h' : '—'}
+                  placeholder={status === 'Done' ? 'e.g. 45 min, 2 hr' : '—'}
                   value={actualInput}
                   onChange={(e) => setActualInput(e.target.value)}
                 />

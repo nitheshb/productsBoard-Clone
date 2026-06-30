@@ -45,7 +45,7 @@ export function ActualTimeDialog({
   const handleConfirm = async () => {
     const minutes = parseDuration(value);
     if (minutes === null || minutes < 0) {
-      setError('Enter a valid time (e.g. 45m, 2h, 1d)');
+      setError('Enter a valid time (e.g. 45 min, 2 hr, 1 day)');
       return;
     }
     setIsLoading(true);
@@ -71,7 +71,7 @@ export function ActualTimeDialog({
           <Label htmlFor="actual-time-input">Actual Time</Label>
           <Input
             id="actual-time-input"
-            placeholder="e.g. 45m, 2h, 1d"
+            placeholder="e.g. 45 min, 2 hr, 1 day"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             autoFocus
@@ -83,7 +83,7 @@ export function ActualTimeDialog({
             }}
           />
           <p className="text-[11px] text-gray-500">
-            Use m / h / d (1d = 8h).
+            Accepts min / hr / day (or m / h / d).
             {estimatedMinutes != null && (
               <> Estimated was <strong>{formatDuration(estimatedMinutes)}</strong>.</>
             )}

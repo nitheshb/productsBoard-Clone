@@ -5,11 +5,22 @@ export const MINUTES_PER_HOUR = 60;
 export const HOURS_PER_DAY = 8;
 export const MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
 
-const TOKEN_RE = /(\d+(?:\.\d+)?)\s*(d|h|m)\b/gi;
+// Accept natural unit variants so users can type "1 hr", "30 min", "2 hours", "1 day", etc.
+const UNIT_TO_KIND: Record<string, 'd' | 'h' | 'm'> = {
+  d: 'd', day: 'd', days: 'd',
+  h: 'h', hr: 'h', hrs: 'h', hour: 'h', hours: 'h',
+  m: 'm', min: 'm', mins: 'm', minute: 'm', minutes: 'm',
+};
+const UNIT_PATTERN = Object.keys(UNIT_TO_KIND)
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+const TOKEN_RE = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${UNIT_PATTERN})\\b`, 'gi');
 
 /**
- * Parse a duration string like "30m", "1h", "2.5h", "1d", "1d 2h 30m" into minutes.
- * Returns null on invalid/empty input. Whitespace between tokens is allowed.
+ * Parse a duration string into minutes. Accepts forms like:
+ *   "30m", "30 min", "30 minutes", "1h", "1 hr", "2 hours",
+ *   "2.5h", "1d", "1 day", "1d 2h 30m".
+ * Whitespace and capitalization are flexible. Returns null on invalid/empty input.
  */
 export function parseDuration(input: string): number | null {
   if (typeof input !== 'string') return null;
@@ -24,9 +35,9 @@ export function parseDuration(input: string): number | null {
     matched = true;
     const value = parseFloat(match[1]);
     if (!isFinite(value) || value < 0) return null;
-    const unit = match[2].toLowerCase();
-    if (unit === 'd') total += value * MINUTES_PER_DAY;
-    else if (unit === 'h') total += value * MINUTES_PER_HOUR;
+    const kind = UNIT_TO_KIND[match[2].toLowerCase()];
+    if (kind === 'd') total += value * MINUTES_PER_DAY;
+    else if (kind === 'h') total += value * MINUTES_PER_HOUR;
     else total += value;
     consumed.push([match.index ?? 0, (match.index ?? 0) + match[0].length]);
   }
