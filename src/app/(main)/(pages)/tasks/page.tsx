@@ -762,6 +762,8 @@ export default function TasksPage() {
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-32">Sprint</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-24">Estimated</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-28">Actual</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-24">Start Day</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-24">End Day</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -854,6 +856,20 @@ export default function TasksPage() {
                                         </div>
                                       );
                                     })()}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {task.start_day ? (
+                                      <span className="text-sm text-gray-700">{task.start_day}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400 italic">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {task.end_day ? (
+                                      <span className="text-sm text-gray-700">{task.end_day}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400 italic">—</span>
+                                    )}
                                   </td>
                                 </tr>
                                 );

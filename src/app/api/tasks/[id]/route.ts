@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
+const VALID_DAYS = new Set([
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]);
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -54,6 +64,22 @@ export async function PUT(
       } else {
         updateData.actual_minutes = Math.round(body.actual_minutes);
       }
+    }
+
+    for (const key of ['start_day', 'end_day'] as const) {
+      if (body[key] === undefined) continue;
+      const raw = body[key];
+      if (raw === null || raw === '') {
+        updateData[key] = null;
+        continue;
+      }
+      if (typeof raw !== 'string' || !VALID_DAYS.has(raw)) {
+        return NextResponse.json(
+          { error: `${key} must be one of Monday–Sunday` },
+          { status: 400 }
+        );
+      }
+      updateData[key] = raw;
     }
 
     const { data, error } = await supabase

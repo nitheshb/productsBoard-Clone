@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
+const VALID_DAYS = new Set([
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]);
+
+function normalizeDayInput(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string' || !VALID_DAYS.has(value)) {
+    return '__invalid__';
+  }
+  return value;
+}
+
 async function generateTicketKey(): Promise<string> {
   const { data, error } = await supabase
     .from('pb_tasks')
@@ -86,6 +105,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const dayFields: Record<string, string | null> = {};
+    for (const key of ['start_day', 'end_day'] as const) {
+      const normalized = normalizeDayInput(body[key]);
+      if (normalized === '__invalid__') {
+        return NextResponse.json(
+          { error: `${key} must be one of Monday–Sunday` },
+          { status: 400 }
+        );
+      }
+      if (normalized !== undefined) dayFields[key] = normalized;
+    }
+
     const ticketKey = await generateTicketKey();
 
     const { data, error } = await supabase
@@ -103,6 +134,7 @@ export async function POST(request: NextRequest) {
         estimated_minutes: Math.round(body.estimated_minutes),
         actual_minutes:
           typeof body.actual_minutes === 'number' ? Math.round(body.actual_minutes) : null,
+        ...dayFields,
       }])
       .select()
       .single();

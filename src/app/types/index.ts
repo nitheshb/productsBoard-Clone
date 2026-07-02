@@ -136,6 +136,25 @@ export type TaskIssueType = 'Story' | 'Task' | 'Bug';
 export type TaskStatus = 'To Do' | 'In Progress' | 'Done';
 export type TaskPriority = 'Highest' | 'High' | 'Medium' | 'Low' | 'Lowest';
 
+export type DayOfWeek =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+export const DAYS_OF_WEEK: DayOfWeek[] = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
 export interface BoardTask {
   id: string;
   ticket_key: string;
@@ -150,6 +169,8 @@ export interface BoardTask {
   sprint_name?: string | null;
   estimated_minutes?: number | null;
   actual_minutes?: number | null;
+  start_day?: DayOfWeek | null;
+  end_day?: DayOfWeek | null;
   created_at: string;
   updated_at?: string;
 }
