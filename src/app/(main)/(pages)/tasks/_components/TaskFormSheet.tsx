@@ -13,7 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
+import {
+  BoardTask,
+  DayOfWeek,
+  DAYS_OF_WEEK,
+  Sprint,
+  TaskIssueType,
+  TaskPriority,
+  TaskStatus,
+} from '@/app/types';
 import { TeamMember } from '@/utils/teamUtils';
 import { parseDuration, formatDuration } from '@/lib/timeUtils';
 
@@ -60,6 +68,8 @@ export default function TaskFormSheet({
   const [sprintId, setSprintId] = useState<string>('');
   const [estimatedInput, setEstimatedInput] = useState('');
   const [actualInput, setActualInput] = useState('');
+  const [startDay, setStartDay] = useState<'' | DayOfWeek>('');
+  const [endDay, setEndDay] = useState<'' | DayOfWeek>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -78,6 +88,8 @@ export default function TaskFormSheet({
         task.estimated_minutes != null ? formatDuration(task.estimated_minutes) : ''
       );
       setActualInput(task.actual_minutes != null ? formatDuration(task.actual_minutes) : '');
+      setStartDay(task.start_day ?? '');
+      setEndDay(task.end_day ?? '');
     } else {
       setSummary('');
       setDescription('');
@@ -88,6 +100,8 @@ export default function TaskFormSheet({
       setSprintId('');
       setEstimatedInput('');
       setActualInput('');
+      setStartDay('');
+      setEndDay('');
     }
     setError('');
   }, [open, task, defaultAssignee]);
@@ -132,6 +146,8 @@ export default function TaskFormSheet({
         sprint_id: sprintId || null,
         estimated_minutes: estimatedMinutes,
         actual_minutes: actualMinutes,
+        start_day: startDay || null,
+        end_day: endDay || null,
       };
 
       const res = await fetch(isEditMode ? `/api/tasks/${task!.id}` : '/api/tasks', {
@@ -296,6 +312,43 @@ export default function TaskFormSheet({
                     ? 'Fill this in when completing the task.'
                     : 'Leave empty until the task is completed.'}
                 </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
+              <div className="space-y-2">
+                <Label htmlFor="startDay">Start Day</Label>
+                <select
+                  id="startDay"
+                  value={startDay}
+                  onChange={(e) => setStartDay(e.target.value as '' | DayOfWeek)}
+                  className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Not set —</option>
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500">Day the task was started.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endDay">End Day</Label>
+                <select
+                  id="endDay"
+                  value={endDay}
+                  onChange={(e) => setEndDay(e.target.value as '' | DayOfWeek)}
+                  className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Not set —</option>
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500">Day the task was finished.</p>
               </div>
             </div>
 
