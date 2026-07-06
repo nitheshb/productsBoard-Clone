@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/(main)/(pages)/product/_components/sidebar';
 import SprintFormSheet from './_components/SprintFormSheet';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -13,6 +14,7 @@ import {
   PlusIcon,
   TrashIcon,
   CalendarDaysIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import type { Sprint, SprintStatus, SprintWithStats } from '@/app/types';
 
@@ -40,6 +42,7 @@ function durationDays(start: string, end: string): number {
 }
 
 export default function SprintsPage() {
+  const router = useRouter();
   const [sprints, setSprints] = useState<SprintWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -141,10 +144,20 @@ export default function SprintsPage() {
               <ArrowPathIcon className="h-6 w-6 text-blue-500" />
               <h1 className="text-xl font-semibold">Sprints</h1>
             </div>
-            <Button onClick={openCreate} className="bg-blue-500 hover:bg-blue-600">
-              <PlusIcon className="h-4 w-4 mr-1.5" />
-              Create Sprint
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/reviews')}
+                className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <ClipboardDocumentCheckIcon className="h-4 w-4 mr-1.5" />
+                Review
+              </Button>
+              <Button onClick={openCreate} className="bg-blue-500 hover:bg-blue-600">
+                <PlusIcon className="h-4 w-4 mr-1.5" />
+                Create Sprint
+              </Button>
+            </div>
           </header>
 
           <div className="p-6">
