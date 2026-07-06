@@ -240,7 +240,7 @@ export default function ReviewsPage() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-full mx-auto">
           <header className="sticky top-0 z-20 flex justify-between items-center p-4 bg-white border-b">
             <div className="flex items-center gap-2">
               <ClipboardDocumentCheckIcon className="h-6 w-6 text-blue-500" />
