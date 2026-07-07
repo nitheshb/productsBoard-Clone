@@ -200,3 +200,28 @@ export interface SprintWithStats extends Sprint {
   stats: SprintStats;
 }
 
+export interface SprintReview {
+  id: string;
+  sprint_id: string;
+  assignee: string;
+  what_did: string | null;
+  blockers: string | null;
+  improvements: string | null;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AssigneeSprintSummary {
+  assignee: string;
+  total: number;
+  completed: number;
+  in_progress: number;
+  pending: number;
+  estimated_minutes: number;
+  actual_minutes: number;
+  completed_titles: string[];
+  pending_titles: string[];
+  review: SprintReview | null;
+}
+

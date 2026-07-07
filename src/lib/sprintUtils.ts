@@ -1,17 +1,63 @@
 import type { Sprint, SprintStats, SprintStatus, BoardTask } from '@/app/types';
 
+/** Normalize Supabase DATE / ISO strings to YYYY-MM-DD. */
+export function toDateOnly(value: string): string {
+  return value.length >= 10 ? value.substring(0, 10) : value;
+}
+
+function parseLocalDate(value: string): Date {
+  return new Date(`${toDateOnly(value)}T00:00:00`);
+}
+
+function startOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function endOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(23, 59, 59, 999);
+  return copy;
+}
+
 export function deriveSprintStatus(
   startDate: string,
   endDate: string,
   today: Date = new Date()
 ): SprintStatus {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T23:59:59`);
-  const now = new Date(today);
+  const sprintStart = startOfDay(parseLocalDate(startDate));
+  const sprintEnd = endOfDay(parseLocalDate(endDate));
+  const now = startOfDay(today);
 
-  if (now < start) return 'Upcoming';
-  if (now > end) return 'Completed';
+  if (now < sprintStart) return 'Upcoming';
+  if (now > sprintEnd) return 'Completed';
   return 'Active';
+}
+
+/** Returns sprints with status corrected from their date range (in-memory only). */
+export function applyDerivedSprintStatuses(
+  sprints: Sprint[],
+  today: Date = new Date()
+): Sprint[] {
+  return sprints.map((sprint) => {
+    const derived = deriveSprintStatus(sprint.start_date, sprint.end_date, today);
+    return derived === sprint.status ? sprint : { ...sprint, status: derived };
+  });
+}
+
+export function getSprintStatusUpdates(
+  sprints: Sprint[],
+  today: Date = new Date()
+): Array<{ id: string; status: SprintStatus }> {
+  return sprints
+    .map((sprint) => ({
+      id: sprint.id,
+      status: deriveSprintStatus(sprint.start_date, sprint.end_date, today),
+      current: sprint.status,
+    }))
+    .filter((row) => row.status !== row.current)
+    .map(({ id, status }) => ({ id, status }));
 }
 
 export function calculateSprintStats(tasks: BoardTask[]): SprintStats {

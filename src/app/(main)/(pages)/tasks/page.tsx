@@ -261,8 +261,12 @@ export default function TasksPage() {
   }, [sprints]);
 
   const activeSprintId = useMemo(() => {
-    const active = sprints.find((s) => s.status === 'Active');
-    return active ? active.id : null;
+    const activeSprints = sprints.filter((s) => s.status === 'Active');
+    if (activeSprints.length === 0) return null;
+    const sorted = [...activeSprints].sort(
+      (a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+    );
+    return sorted[0].id;
   }, [sprints]);
 
   const weekBounds = useMemo(() => getWeekBounds(), []);

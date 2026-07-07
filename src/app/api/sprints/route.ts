@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import {
-  attachStatsToSprints,
-  deriveSprintStatus,
-} from '@/lib/sprintUtils';
+import { attachStatsToSprints, deriveSprintStatus } from '@/lib/sprintUtils';
+import { syncSprintStatusesInDb } from '@/lib/sprintSync';
 import type { BoardTask, Sprint } from '@/app/types';
 
 function isValidDate(value: unknown): value is string {
@@ -22,9 +20,10 @@ export async function GET() {
     if (sprintsRes.error) throw sprintsRes.error;
     if (tasksRes.error) throw tasksRes.error;
 
-    const sprints = (sprintsRes.data || []) as Sprint[];
+    const rawSprints = (sprintsRes.data || []) as Sprint[];
     const tasks = (tasksRes.data || []) as BoardTask[];
 
+    const sprints = await syncSprintStatusesInDb(rawSprints);
     const sprintsWithStats = attachStatsToSprints(sprints, tasks);
 
     return NextResponse.json({ sprints: sprintsWithStats });

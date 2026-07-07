@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import {
-  attachStatsToSprints,
-  deriveSprintStatus,
-} from '@/lib/sprintUtils';
+import { attachStatsToSprints, deriveSprintStatus } from '@/lib/sprintUtils';
+import { syncSprintStatusesInDb } from '@/lib/sprintSync';
 import type { BoardTask, Sprint } from '@/app/types';
 
 function isValidDate(value: unknown): value is string {
@@ -26,8 +24,9 @@ export async function GET(
     if (sprintRes.error) throw sprintRes.error;
     if (tasksRes.error) throw tasksRes.error;
 
+    const [synced] = await syncSprintStatusesInDb([sprintRes.data as Sprint]);
     const [withStats] = attachStatsToSprints(
-      [sprintRes.data as Sprint],
+      [synced],
       (tasksRes.data || []) as BoardTask[]
     );
 
@@ -78,17 +77,17 @@ export async function PUT(
       updateData.description = body.description?.trim() || null;
     }
 
+    const { data: current, error: currentErr } = await supabase
+      .from('pb_sprints')
+      .select('start_date, end_date')
+      .eq('id', id)
+      .single();
+    if (currentErr) throw currentErr;
+
+    const startDate = body.start_date ?? current.start_date;
+    const endDate = body.end_date ?? current.end_date;
+
     if (body.start_date !== undefined || body.end_date !== undefined) {
-      const { data: current, error: currentErr } = await supabase
-        .from('pb_sprints')
-        .select('start_date, end_date')
-        .eq('id', id)
-        .single();
-      if (currentErr) throw currentErr;
-
-      const startDate = body.start_date ?? current.start_date;
-      const endDate = body.end_date ?? current.end_date;
-
       if (!isValidDate(startDate) || !isValidDate(endDate)) {
         return NextResponse.json(
           { error: 'Valid start_date and end_date are required' },
@@ -104,9 +103,13 @@ export async function PUT(
 
       if (body.start_date !== undefined) updateData.start_date = startDate;
       if (body.end_date !== undefined) updateData.end_date = endDate;
-      updateData.status = deriveSprintStatus(startDate, endDate);
-    } else if (body.status !== undefined) {
+    }
+
+    // Always reconcile status from the sprint's date range (unless explicitly overridden).
+    if (body.status !== undefined && body.start_date === undefined && body.end_date === undefined) {
       updateData.status = body.status;
+    } else {
+      updateData.status = deriveSprintStatus(startDate, endDate);
     }
 
     const { data, error } = await supabase
