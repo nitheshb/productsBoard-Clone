@@ -3,11 +3,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 
 const Sidebar = () => {
   const [activeItem, setActiveItem] = useState('products');
   const router = useRouter();
   const pathname = usePathname();
+  const { member, logout } = useAuth();
 
   // Update active item based on current route
   useEffect(() => {
@@ -19,6 +21,8 @@ const Sidebar = () => {
       setActiveItem('tasks');
     } else if (pathname === '/sprints') {
       setActiveItem('sprints');
+    } else if (pathname === '/team') {
+      setActiveItem('team');
     } else if (pathname === '/product') {
       setActiveItem('products');
     } else if (pathname === '/') {
@@ -77,6 +81,18 @@ const Sidebar = () => {
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
           <polyline points="21 4 21 10 15 10"></polyline>
+        </svg>
+      )
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
       )
     },
@@ -162,6 +178,9 @@ const Sidebar = () => {
                 } else if (item.id === 'sprints') {
                   setActiveItem(item.id);
                   router.push('/sprints');
+                } else if (item.id === 'team') {
+                  setActiveItem(item.id);
+                  router.push('/team');
                 } else if (item.id === 'products') {
                   setActiveItem(item.id);
                   router.push('/product');
@@ -189,12 +208,26 @@ const Sidebar = () => {
       {/* Bottom Icons */}
       <div className="mt-auto w-full">
         <div className="flex flex-col items-center">
-          <div className="py-3 text-black cursor-pointer hover:text-blue-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-            </svg>
-          </div>
+          {member && (
+            <div
+              className="py-3 flex flex-col items-center gap-1"
+              title={`${member.name}${member.email ? ` · ${member.email}` : ''}`}
+            >
+              <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
+                {(member.initials || member.name.slice(0, 2)).toUpperCase()}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await logout();
+                  router.replace('/login');
+                }}
+                className="text-[10px] text-gray-500 hover:text-blue-500"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <div className="py-3 text-black cursor-pointer hover:text-blue-500">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
