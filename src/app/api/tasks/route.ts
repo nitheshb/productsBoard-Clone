@@ -119,6 +119,12 @@ export async function POST(request: NextRequest) {
 
     const ticketKey = await generateTicketKey();
 
+    const trimOrNull = (v: unknown): string | null => {
+      if (typeof v !== 'string') return null;
+      const t = v.trim();
+      return t.length > 0 ? t : null;
+    };
+
     const { data, error } = await supabase
       .from('pb_tasks')
       .insert([{
@@ -134,6 +140,10 @@ export async function POST(request: NextRequest) {
         estimated_minutes: Math.round(body.estimated_minutes),
         actual_minutes:
           typeof body.actual_minutes === 'number' ? Math.round(body.actual_minutes) : null,
+        pr_url: trimOrNull(body.pr_url),
+        approach: trimOrNull(body.approach),
+        acceptance_criteria: trimOrNull(body.acceptance_criteria),
+        repro_steps: trimOrNull(body.repro_steps),
         ...dayFields,
       }])
       .select()
