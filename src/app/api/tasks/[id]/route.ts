@@ -32,6 +32,16 @@ export async function PUT(
     if (body.assignee_id !== undefined) updateData.assignee_id = body.assignee_id;
     if (body.sprint_id !== undefined) updateData.sprint_id = body.sprint_id || null;
 
+    const trimOrNull = (v: unknown): string | null => {
+      if (v === null) return null;
+      if (typeof v !== 'string') return null;
+      const t = v.trim();
+      return t.length > 0 ? t : null;
+    };
+    for (const key of ['pr_url', 'approach', 'acceptance_criteria', 'repro_steps'] as const) {
+      if (body[key] !== undefined) updateData[key] = trimOrNull(body[key]);
+    }
+
     if (body.estimated_minutes !== undefined) {
       if (body.estimated_minutes === null) {
         updateData.estimated_minutes = null;
