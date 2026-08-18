@@ -201,6 +201,12 @@ export async function POST(request: NextRequest) {
       return t.length > 0 ? t : null;
     };
 
+    const trimOrNull = (v: unknown): string | null => {
+      if (typeof v !== 'string') return null;
+      const t = v.trim();
+      return t.length > 0 ? t : null;
+    };
+
     const { data, error } = await supabase
       .from('pb_tasks')
       .insert([{
