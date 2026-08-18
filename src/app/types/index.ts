@@ -167,12 +167,32 @@ export interface BoardTask {
   assignee_id?: string | null;
   sprint_id?: string | null;
   sprint_name?: string | null;
+  product_id?: string | null;
+  product_name?: string | null;
+  product_ids?: string[];
+  products?: Array<{ id: string; name: string }>;
   estimated_minutes?: number | null;
   actual_minutes?: number | null;
   start_day?: DayOfWeek | null;
   end_day?: DayOfWeek | null;
+  pr_url?: string | null;
+  approach?: string | null;
+  acceptance_criteria?: string | null;
+  repro_steps?: string | null;
   created_at: string;
   updated_at?: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  file_name: string;
+  file_path: string;
+  file_url: string;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  uploaded_by?: string | null;
+  created_at: string;
 }
 
 export type SprintStatus = 'Upcoming' | 'Active' | 'Completed';

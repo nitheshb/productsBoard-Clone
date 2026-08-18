@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -17,22 +17,42 @@ import {
   BoardTask,
   DayOfWeek,
   DAYS_OF_WEEK,
+  Product,
   Sprint,
+  TaskAttachment,
   TaskIssueType,
   TaskPriority,
   TaskStatus,
 } from '@/app/types';
 import { TeamMember } from '@/utils/teamUtils';
 import { parseDuration, formatDuration } from '@/lib/timeUtils';
+import { supabase } from '@/lib/supabaseClient';
+import ProductSelect from './ProductSelect';
+
+const ATTACHMENTS_BUCKET = 'pb-task-attachments';
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes || bytes <= 0) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
+function isImageMime(mime: string | null | undefined): boolean {
+  return typeof mime === 'string' && mime.startsWith('image/');
+}
 
 interface TaskFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: TeamMember[];
   sprints?: Sprint[];
+  products?: Product[];
   task?: BoardTask | null;
   defaultAssignee?: string;
   onSaved: () => void;
+  onProductCreated?: (product: Product) => void;
 }
 
 const ISSUE_TYPES: TaskIssueType[] = ['Story', 'Task', 'Bug'];
@@ -53,9 +73,11 @@ export default function TaskFormSheet({
   onOpenChange,
   members,
   sprints = [],
+  products = [],
   task,
   defaultAssignee,
   onSaved,
+  onProductCreated,
 }: TaskFormSheetProps) {
   const isEditMode = Boolean(task);
 
@@ -66,10 +88,20 @@ export default function TaskFormSheet({
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [assignee, setAssignee] = useState('');
   const [sprintId, setSprintId] = useState<string>('');
+  const [productIds, setProductIds] = useState<string[]>([]);
   const [estimatedInput, setEstimatedInput] = useState('');
   const [actualInput, setActualInput] = useState('');
   const [startDay, setStartDay] = useState<'' | DayOfWeek>('');
   const [endDay, setEndDay] = useState<'' | DayOfWeek>('');
+  const [prUrl, setPrUrl] = useState('');
+  const [approach, setApproach] = useState('');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [reproSteps, setReproSteps] = useState('');
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -84,12 +116,23 @@ export default function TaskFormSheet({
       setPriority(task.priority);
       setAssignee(task.assignee);
       setSprintId(task.sprint_id || '');
+      setProductIds(
+        task.product_ids?.length
+          ? task.product_ids
+          : task.product_id
+            ? [task.product_id]
+            : []
+      );
       setEstimatedInput(
         task.estimated_minutes != null ? formatDuration(task.estimated_minutes) : ''
       );
       setActualInput(task.actual_minutes != null ? formatDuration(task.actual_minutes) : '');
       setStartDay(task.start_day ?? '');
       setEndDay(task.end_day ?? '');
+      setPrUrl(task.pr_url || '');
+      setApproach(task.approach || '');
+      setAcceptanceCriteria(task.acceptance_criteria || '');
+      setReproSteps(task.repro_steps || '');
     } else {
       setSummary('');
       setDescription('');
@@ -98,13 +141,113 @@ export default function TaskFormSheet({
       setPriority('Medium');
       setAssignee(defaultAssignee || '');
       setSprintId('');
+      setProductIds([]);
       setEstimatedInput('');
       setActualInput('');
       setStartDay('');
       setEndDay('');
+      setPrUrl('');
+      setApproach('');
+      setAcceptanceCriteria('');
+      setReproSteps('');
+      setAttachments([]);
     }
     setError('');
+    setAttachmentError('');
   }, [open, task, defaultAssignee]);
+
+  const loadAttachments = useCallback(async (taskId: string) => {
+    setIsLoadingAttachments(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/attachments`);
+      if (!res.ok) throw new Error('Failed to load attachments');
+      const json = await res.json();
+      setAttachments(json.attachments || []);
+    } catch (err) {
+      console.error(err);
+      setAttachmentError(err instanceof Error ? err.message : 'Failed to load attachments');
+    } finally {
+      setIsLoadingAttachments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !task?.id) return;
+    loadAttachments(task.id);
+  }, [open, task?.id, loadAttachments]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !task) return;
+
+    setAttachmentError('');
+    setIsUploading(true);
+
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          throw new Error(`${file.name} exceeds 10 MB limit`);
+        }
+
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${task.id}/${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(ATTACHMENTS_BUCKET)
+          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from(ATTACHMENTS_BUCKET)
+          .getPublicUrl(path);
+
+        const metaRes = await fetch(`/api/tasks/${task.id}/attachments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_name: file.name,
+            file_path: path,
+            file_url: publicUrlData.publicUrl,
+            mime_type: file.type || null,
+            size_bytes: file.size,
+            uploaded_by: assignee || null,
+          }),
+        });
+        if (!metaRes.ok) {
+          const errBody = await metaRes.json().catch(() => ({}));
+          throw new Error(errBody.error || 'Failed to save attachment metadata');
+        }
+      }
+
+      await loadAttachments(task.id);
+    } catch (err) {
+      console.error(err);
+      setAttachmentError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: TaskAttachment) => {
+    if (!task) return;
+    if (!window.confirm(`Remove attachment "${attachment.file_name}"?`)) return;
+    setAttachmentError('');
+    try {
+      const res = await fetch(
+        `/api/tasks/${task.id}/attachments?attachmentId=${attachment.id}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to delete attachment');
+      }
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (err) {
+      console.error(err);
+      setAttachmentError(err instanceof Error ? err.message : 'Delete failed');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +273,19 @@ export default function TaskFormSheet({
       actualMinutes = parsed;
     }
 
+    const trimmedPrUrl = prUrl.trim();
+    if (trimmedPrUrl) {
+      try {
+        const parsed = new URL(trimmedPrUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error();
+        }
+      } catch {
+        setError('PR link must be a valid http(s) URL');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError('');
 
@@ -144,10 +300,16 @@ export default function TaskFormSheet({
         assignee,
         assignee_id: member?.id || null,
         sprint_id: sprintId || null,
+        product_ids: productIds,
+        product_id: productIds[0] || null,
         estimated_minutes: estimatedMinutes,
         actual_minutes: actualMinutes,
         start_day: startDay || null,
         end_day: endDay || null,
+        pr_url: trimmedPrUrl || null,
+        approach: approach.trim() || null,
+        acceptance_criteria: acceptanceCriteria.trim() || null,
+        repro_steps: reproSteps.trim() || null,
       };
 
       const res = await fetch(isEditMode ? `/api/tasks/${task!.id}` : '/api/tasks', {
@@ -237,16 +399,27 @@ export default function TaskFormSheet({
               )}
             </div>
 
-            <div className="space-y-2 w-full min-w-0">
-              <Label htmlFor="summary">Summary</Label>
-              <Input
-                id="summary"
-                placeholder="What needs to be done?"
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                autoFocus={!isEditMode}
-                className="w-full max-w-full box-border focus-visible:ring-offset-0"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="summary">Summary</Label>
+                <Input
+                  id="summary"
+                  placeholder="What needs to be done?"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  autoFocus={!isEditMode}
+                  className="w-full max-w-full box-border focus-visible:ring-offset-0"
+                />
+              </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="product">Products</Label>
+                <ProductSelect
+                  products={products}
+                  value={productIds}
+                  onChange={setProductIds}
+                  onProductCreated={onProductCreated}
+                />
+              </div>
             </div>
 
             <div className="space-y-2 w-full min-w-0">
@@ -400,6 +573,168 @@ export default function TaskFormSheet({
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* --- Additional ticket details --- */}
+            <div className="pt-2 w-full min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Details</h3>
+
+              <div className="space-y-4">
+                <div className="space-y-2 w-full min-w-0">
+                  <Label htmlFor="prUrl">PR / Merge Request Link</Label>
+                  <Input
+                    id="prUrl"
+                    type="url"
+                    placeholder="https://github.com/org/repo/pull/123"
+                    value={prUrl}
+                    onChange={(e) => setPrUrl(e.target.value)}
+                    className="w-full max-w-full box-border"
+                  />
+                  {prUrl.trim() && (
+                    <a
+                      href={prUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block text-xs text-blue-600 hover:underline break-all"
+                    >
+                      Open link ↗
+                    </a>
+                  )}
+                </div>
+
+                <div className="space-y-2 w-full min-w-0">
+                  <Label htmlFor="approach">Approach / Implementation Notes</Label>
+                  <Textarea
+                    id="approach"
+                    placeholder="Describe the approach taken, key decisions, tradeoffs, technical context..."
+                    value={approach}
+                    onChange={(e) => setApproach(e.target.value)}
+                    rows={4}
+                    className="w-full max-w-full box-border resize-y"
+                  />
+                </div>
+
+                <div className="space-y-2 w-full min-w-0">
+                  <Label htmlFor="acceptance">Acceptance Criteria</Label>
+                  <Textarea
+                    id="acceptance"
+                    placeholder={'- Given ...\n- When ...\n- Then ...'}
+                    value={acceptanceCriteria}
+                    onChange={(e) => setAcceptanceCriteria(e.target.value)}
+                    rows={3}
+                    className="w-full max-w-full box-border resize-y"
+                  />
+                </div>
+
+                {issueType === 'Bug' && (
+                  <div className="space-y-2 w-full min-w-0">
+                    <Label htmlFor="repro">Steps to Reproduce</Label>
+                    <Textarea
+                      id="repro"
+                      placeholder={'1. Go to ...\n2. Click ...\n3. Observed: ...\nExpected: ...'}
+                      value={reproSteps}
+                      onChange={(e) => setReproSteps(e.target.value)}
+                      rows={4}
+                      className="w-full max-w-full box-border resize-y"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* --- Attachments --- */}
+            <div className="pt-2 w-full min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Attachments</h3>
+                {isEditMode && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.txt,.md,.log,.zip"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {isUploading ? 'Uploading…' : 'Upload files'}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {!isEditMode ? (
+                <p className="text-xs text-gray-500">
+                  Save the task first, then reopen it to attach screenshots or files.
+                </p>
+              ) : (
+                <>
+                  {isLoadingAttachments && (
+                    <p className="text-xs text-gray-500">Loading attachments…</p>
+                  )}
+                  {!isLoadingAttachments && attachments.length === 0 && (
+                    <p className="text-xs text-gray-500">
+                      No attachments yet. Drop screenshots, PDFs, or logs above (max 10 MB each).
+                    </p>
+                  )}
+                  {attachments.length > 0 && (
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {attachments.map((att) => (
+                        <li
+                          key={att.id}
+                          className="border border-gray-200 rounded-md p-2 flex flex-col gap-2 bg-white"
+                        >
+                          {isImageMime(att.mime_type) ? (
+                            <a href={att.file_url} target="_blank" rel="noopener noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={att.file_url}
+                                alt={att.file_name}
+                                className="w-full h-32 object-cover rounded"
+                              />
+                            </a>
+                          ) : (
+                            <div className="w-full h-32 flex items-center justify-center bg-gray-50 rounded text-xs text-gray-500">
+                              {(att.mime_type || 'file').split('/')[1] || 'file'}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-2">
+                            <a
+                              href={att.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline truncate"
+                              title={att.file_name}
+                            >
+                              {att.file_name}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(att)}
+                              className="text-xs text-red-600 hover:text-red-700 shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-gray-500">
+                            {formatBytes(att.size_bytes)}
+                            {att.uploaded_by ? ` • ${att.uploaded_by}` : ''}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {attachmentError && (
+                    <p className="mt-2 text-xs text-red-500">{attachmentError}</p>
+                  )}
+                </>
+              )}
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}

@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('pb_products')
       .insert([{
-        name: body.name,
-        status: body.status || null,
+        name: typeof body.name === 'string' ? body.name.trim() : body.name,
+        status: body.status || 'Todo',
         progress: body.progress !== undefined ? body.progress : 0,
         version: body.version || '1.0.0',
         team: body.team || null,

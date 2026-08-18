@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Sidebar from '@/app/(main)/(pages)/product/_components/sidebar';
 import TaskFormSheet from './_components/TaskFormSheet';
-import { BoardTask, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
+import { BoardTask, Product, Sprint, TaskIssueType, TaskPriority, TaskStatus } from '@/app/types';
 import { fetchExistingTeamMembers, teamEventEmitter, TeamMember } from '@/utils/teamUtils';
 import { FilterContainer } from '@/components/filters/filtercontainer';
 import { NO_SPRINT_VALUE } from '@/components/filters/SprintFilter';
+import { NO_PRODUCT_VALUE } from '@/components/filters/ProductFilter';
 import { ActualTimeDialog } from './_components/ActualTimeDialog';
 import { computeVariance, formatDuration } from '@/lib/timeUtils';
 import {
@@ -96,6 +97,8 @@ function getTaskSearchText(task: BoardTask): string {
     task.status,
     task.priority,
     task.issue_type,
+    task.product_name || '',
+    ...(task.products || []).map((p) => p.name),
   ]
     .join(' ')
     .toLowerCase();
@@ -135,6 +138,19 @@ function taskMatchesSprintFilter(task: BoardTask, selectedSprintIds: string[]): 
   if (selectedSprintIds.length === 0) return true;
   if (!task.sprint_id) return selectedSprintIds.includes(NO_SPRINT_VALUE);
   return selectedSprintIds.includes(task.sprint_id);
+}
+
+function getTaskProductIds(task: BoardTask): string[] {
+  if (task.product_ids && task.product_ids.length > 0) return task.product_ids;
+  if (task.product_id) return [task.product_id];
+  return [];
+}
+
+function taskMatchesProductFilter(task: BoardTask, selectedProductIds: string[]): boolean {
+  if (selectedProductIds.length === 0) return true;
+  const taskProductIds = getTaskProductIds(task);
+  if (taskProductIds.length === 0) return selectedProductIds.includes(NO_PRODUCT_VALUE);
+  return taskProductIds.some((id) => selectedProductIds.includes(id));
 }
 
 function taskMatchesDateFilter(
@@ -249,10 +265,12 @@ export default function TasksPage() {
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [selectedTaskTypes, setSelectedTaskTypes] = useState<string[]>([]);
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [availableTeams, setAvailableTeams] = useState<Array<string | TeamMember>>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all');
   const [actualTimePromptTask, setActualTimePromptTask] = useState<BoardTask | null>(null);
 
@@ -282,6 +300,17 @@ export default function TasksPage() {
     }
   }, []);
 
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/product');
+      if (!res.ok) return;
+      const data = await res.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch {
+      setProducts([]);
+    }
+  }, []);
+
   const fetchTasks = useCallback(async () => {
     try {
       const res = await fetch('/api/tasks');
@@ -305,13 +334,14 @@ export default function TasksPage() {
         fetchExistingTeamMembers(true),
         fetchTasks(),
         fetchSprints(),
+        fetchProducts(),
       ]);
       setMembers(membersData);
       setAvailableTeams(membersData);
       setIsLoading(false);
     }
     load();
-  }, [fetchTasks, fetchSprints]);
+  }, [fetchTasks, fetchSprints, fetchProducts]);
 
   useEffect(() => {
     const unsubscribe = teamEventEmitter.subscribe((teamName: string) => {
@@ -332,6 +362,7 @@ export default function TasksPage() {
     selectedVersions.length > 0 ||
     selectedTaskTypes.length > 0 ||
     selectedSprintIds.length > 0 ||
+    selectedProductIds.length > 0 ||
     quickFilter !== 'all' ||
     Boolean(startDate) ||
     Boolean(endDate);
@@ -350,6 +381,7 @@ export default function TasksPage() {
         taskMatchesPriorityFilter(task, selectedVersions) &&
         taskMatchesIssueTypeFilter(task, selectedTaskTypes) &&
         taskMatchesSprintFilter(task, selectedSprintIds) &&
+        taskMatchesProductFilter(task, selectedProductIds) &&
         taskMatchesDateFilter(task, startDate, endDate) &&
         taskMatchesQuickFilter(task, quickFilter, quickCtx)
     );
@@ -360,6 +392,7 @@ export default function TasksPage() {
     selectedVersions,
     selectedTaskTypes,
     selectedSprintIds,
+    selectedProductIds,
     startDate,
     endDate,
     quickFilter,
@@ -518,6 +551,7 @@ export default function TasksPage() {
     setSelectedVersions([]);
     setSelectedTaskTypes([]);
     setSelectedSprintIds([]);
+    setSelectedProductIds([]);
     setStartDate(undefined);
     setEndDate(undefined);
     setQuickFilter('all');
@@ -625,6 +659,9 @@ export default function TasksPage() {
               selectedSprintIds={selectedSprintIds}
               availableSprints={sprints}
               onSprintSelect={setSelectedSprintIds}
+              selectedProductIds={selectedProductIds}
+              availableProducts={products}
+              onProductSelect={setSelectedProductIds}
               startDate={startDate}
               endDate={endDate}
               availableTeams={availableTeams}
@@ -654,9 +691,13 @@ export default function TasksPage() {
                 <h2 className="text-lg font-semibold text-gray-600 mb-2">Unable to load tasks</h2>
                 <p className="text-gray-500 text-sm max-w-md mb-4">{fetchError}</p>
                 <p className="text-gray-400 text-xs max-w-md">
-                  If this is your first time, run the migration in{' '}
-                  <code className="bg-gray-100 px-1 rounded">database_pb_tasks_migration.sql</code>{' '}
-                  in your Supabase SQL editor.
+                  If this is your first time, run the migrations in{' '}
+                  <code className="bg-gray-100 px-1 rounded">database_pb_tasks_migration.sql</code>
+                  {', '}
+                  <code className="bg-gray-100 px-1 rounded">database_pb_tasks_product_migration.sql</code>
+                  {' '}and{' '}
+                  <code className="bg-gray-100 px-1 rounded">database_pb_tasks_products_many_migration.sql</code>
+                  {' '}in your Supabase SQL editor.
                 </p>
               </div>
             ) : memberGroups.length === 0 && isFiltering ? (
@@ -760,6 +801,7 @@ export default function TasksPage() {
                               <tr className="border-b border-gray-100 bg-white">
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-24">Key</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500">Summary</th>
+                                <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-48">Products</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-32">Issue Type</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-36">Status</th>
                                 <th className="py-2.5 px-4 text-left text-xs font-medium text-gray-500 w-28">Priority</th>
@@ -790,6 +832,33 @@ export default function TasksPage() {
                                   </td>
                                   <td className="py-3 px-4">
                                     <span className="text-sm text-gray-900">{task.summary}</span>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {(() => {
+                                      const names =
+                                        task.products && task.products.length > 0
+                                          ? task.products.map((p) => p.name)
+                                          : task.product_name
+                                            ? task.product_name.split(', ')
+                                            : [];
+                                      if (names.length === 0) {
+                                        return (
+                                          <span className="text-xs text-gray-400 italic">No Product</span>
+                                        );
+                                      }
+                                      return (
+                                        <div className="flex flex-wrap gap-1">
+                                          {names.map((name) => (
+                                            <span
+                                              key={name}
+                                              className="inline-flex items-center text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-0.5"
+                                            >
+                                              {name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
                                   </td>
                                   <td className="py-3 px-4">
                                     <div className="flex items-center gap-2">
@@ -896,9 +965,16 @@ export default function TasksPage() {
         onOpenChange={handleSheetOpenChange}
         members={members}
         sprints={sprints}
+        products={products}
         task={selectedTask}
         defaultAssignee={createForMember}
         onSaved={fetchTasks}
+        onProductCreated={(product) => {
+          setProducts((prev) => {
+            if (prev.some((p) => p.id === product.id)) return prev;
+            return [product, ...prev];
+          });
+        }}
       />
 
       <ActualTimeDialog
