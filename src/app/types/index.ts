@@ -167,6 +167,10 @@ export interface BoardTask {
   assignee_id?: string | null;
   sprint_id?: string | null;
   sprint_name?: string | null;
+  product_id?: string | null;
+  product_name?: string | null;
+  product_ids?: string[];
+  products?: Array<{ id: string; name: string }>;
   estimated_minutes?: number | null;
   actual_minutes?: number | null;
   start_day?: DayOfWeek | null;

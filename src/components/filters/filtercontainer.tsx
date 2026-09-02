@@ -10,7 +10,8 @@ import { VersionFilter } from './VersionFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
 import { DateFilter } from './DateFilter';
 import { SprintFilter, NO_SPRINT_VALUE } from './SprintFilter';
-import type { Sprint } from '@/app/types';
+import { ProductFilter, NO_PRODUCT_VALUE } from './ProductFilter';
+import type { Product, Sprint } from '@/app/types';
 
 interface FilterContainerProps {
   selectedTeams: Array<string | TeamMember>;
@@ -26,6 +27,9 @@ interface FilterContainerProps {
   selectedSprintIds?: string[];
   availableSprints?: Sprint[];
   onSprintSelect?: (ids: string[]) => void;
+  selectedProductIds?: string[];
+  availableProducts?: Product[];
+  onProductSelect?: (ids: string[]) => void;
   onTeamSelect: (teams: Array<string | TeamMember>) => void;
   onStatusSelect: (statuses: string[]) => void;
   onVersionSelect: (versions: string[]) => void;
@@ -48,6 +52,9 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
   selectedSprintIds,
   availableSprints,
   onSprintSelect,
+  selectedProductIds,
+  availableProducts,
+  onProductSelect,
   onTeamSelect,
   onStatusSelect,
   onVersionSelect,
@@ -59,6 +66,11 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
     Array.isArray(selectedSprintIds) && Array.isArray(availableSprints) && Boolean(onSprintSelect);
   const sprintNameById = new Map<string, string>(
     (availableSprints || []).map((s) => [s.id, s.name])
+  );
+  const productFilterEnabled =
+    Array.isArray(selectedProductIds) && Array.isArray(availableProducts) && Boolean(onProductSelect);
+  const productNameById = new Map<string, string>(
+    (availableProducts || []).map((p) => [p.id, p.name])
   );
   const [localAvailableTeams, setLocalAvailableTeams] = useState<Array<string | TeamMember>>(availableTeams || []);
 
@@ -80,6 +92,7 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
                           selectedVersions.length > 0 ||
                           selectedTaskTypes.length > 0 ||
                           (sprintFilterEnabled && (selectedSprintIds?.length || 0) > 0) ||
+                          (productFilterEnabled && (selectedProductIds?.length || 0) > 0) ||
                           startDate ||
                           endDate;
 
@@ -121,6 +134,14 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
             selectedSprintIds={selectedSprintIds || []}
             availableSprints={availableSprints || []}
             onSprintSelect={onSprintSelect!}
+          />
+        )}
+
+        {productFilterEnabled && (
+          <ProductFilter
+            selectedProductIds={selectedProductIds || []}
+            availableProducts={availableProducts || []}
+            onProductSelect={onProductSelect!}
           />
         )}
 
@@ -230,6 +251,31 @@ export const FilterContainer: React.FC<FilterContainerProps> = ({
                     onSprintSelect!((selectedSprintIds || []).filter((s) => s !== sprintId))
                   }
                   className="ml-1 rounded-full hover:bg-sky-300 h-4 w-4 flex items-center justify-center transition-colors"
+                >
+                  ×
+                </button>
+              </Badge>
+            );
+          })}
+
+          {productFilterEnabled && (selectedProductIds || []).map((productId) => {
+            const label =
+              productId === NO_PRODUCT_VALUE
+                ? 'No Product'
+                : productNameById.get(productId) || 'Product';
+            return (
+              <Badge
+                key={productId}
+                variant="secondary"
+                className="text-xs bg-teal-100 text-teal-800 hover:bg-teal-200"
+              >
+                <span className="mr-1">📦</span>
+                {label}
+                <button
+                  onClick={() =>
+                    onProductSelect!((selectedProductIds || []).filter((p) => p !== productId))
+                  }
+                  className="ml-1 rounded-full hover:bg-teal-300 h-4 w-4 flex items-center justify-center transition-colors"
                 >
                   ×
                 </button>

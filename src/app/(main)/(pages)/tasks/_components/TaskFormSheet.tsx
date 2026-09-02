@@ -17,6 +17,7 @@ import {
   BoardTask,
   DayOfWeek,
   DAYS_OF_WEEK,
+  Product,
   Sprint,
   TaskAttachment,
   TaskIssueType,
@@ -26,6 +27,7 @@ import {
 import { TeamMember } from '@/utils/teamUtils';
 import { parseDuration, formatDuration } from '@/lib/timeUtils';
 import { supabase } from '@/lib/supabaseClient';
+import ProductSelect from './ProductSelect';
 
 const ATTACHMENTS_BUCKET = 'pb-task-attachments';
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -46,9 +48,11 @@ interface TaskFormSheetProps {
   onOpenChange: (open: boolean) => void;
   members: TeamMember[];
   sprints?: Sprint[];
+  products?: Product[];
   task?: BoardTask | null;
   defaultAssignee?: string;
   onSaved: () => void;
+  onProductCreated?: (product: Product) => void;
 }
 
 const ISSUE_TYPES: TaskIssueType[] = ['Story', 'Task', 'Bug'];
@@ -69,9 +73,11 @@ export default function TaskFormSheet({
   onOpenChange,
   members,
   sprints = [],
+  products = [],
   task,
   defaultAssignee,
   onSaved,
+  onProductCreated,
 }: TaskFormSheetProps) {
   const isEditMode = Boolean(task);
 
@@ -82,6 +88,7 @@ export default function TaskFormSheet({
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [assignee, setAssignee] = useState('');
   const [sprintId, setSprintId] = useState<string>('');
+  const [productIds, setProductIds] = useState<string[]>([]);
   const [estimatedInput, setEstimatedInput] = useState('');
   const [actualInput, setActualInput] = useState('');
   const [startDay, setStartDay] = useState<'' | DayOfWeek>('');
@@ -109,6 +116,13 @@ export default function TaskFormSheet({
       setPriority(task.priority);
       setAssignee(task.assignee);
       setSprintId(task.sprint_id || '');
+      setProductIds(
+        task.product_ids?.length
+          ? task.product_ids
+          : task.product_id
+            ? [task.product_id]
+            : []
+      );
       setEstimatedInput(
         task.estimated_minutes != null ? formatDuration(task.estimated_minutes) : ''
       );
@@ -127,6 +141,7 @@ export default function TaskFormSheet({
       setPriority('Medium');
       setAssignee(defaultAssignee || '');
       setSprintId('');
+      setProductIds([]);
       setEstimatedInput('');
       setActualInput('');
       setStartDay('');
@@ -285,6 +300,8 @@ export default function TaskFormSheet({
         assignee,
         assignee_id: member?.id || null,
         sprint_id: sprintId || null,
+        product_ids: productIds,
+        product_id: productIds[0] || null,
         estimated_minutes: estimatedMinutes,
         actual_minutes: actualMinutes,
         start_day: startDay || null,
@@ -382,16 +399,27 @@ export default function TaskFormSheet({
               )}
             </div>
 
-            <div className="space-y-2 w-full min-w-0">
-              <Label htmlFor="summary">Summary</Label>
-              <Input
-                id="summary"
-                placeholder="What needs to be done?"
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                autoFocus={!isEditMode}
-                className="w-full max-w-full box-border focus-visible:ring-offset-0"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="summary">Summary</Label>
+                <Input
+                  id="summary"
+                  placeholder="What needs to be done?"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  autoFocus={!isEditMode}
+                  className="w-full max-w-full box-border focus-visible:ring-offset-0"
+                />
+              </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="product">Products</Label>
+                <ProductSelect
+                  products={products}
+                  value={productIds}
+                  onChange={setProductIds}
+                  onProductCreated={onProductCreated}
+                />
+              </div>
             </div>
 
             <div className="space-y-2 w-full min-w-0">

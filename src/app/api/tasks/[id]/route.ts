@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { parseProductIds, replaceTaskProducts } from '@/lib/taskProducts';
 
 const VALID_DAYS = new Set([
   'Monday',
@@ -31,6 +32,12 @@ export async function PUT(
     if (body.assignee !== undefined) updateData.assignee = body.assignee;
     if (body.assignee_id !== undefined) updateData.assignee_id = body.assignee_id;
     if (body.sprint_id !== undefined) updateData.sprint_id = body.sprint_id || null;
+
+    const productIds =
+      body.product_ids !== undefined || body.product_id !== undefined
+        ? parseProductIds(body)
+        : undefined;
+    if (productIds) updateData.product_id = productIds[0] || null;
 
     const trimOrNull = (v: unknown): string | null => {
       if (v === null) return null;
@@ -100,6 +107,14 @@ export async function PUT(
       .single();
 
     if (error) throw error;
+
+    if (productIds) {
+      try {
+        await replaceTaskProducts(id, productIds);
+      } catch (linkError) {
+        console.error('Error saving task products:', linkError);
+      }
+    }
 
     return NextResponse.json(data);
   } catch (error: unknown) {
